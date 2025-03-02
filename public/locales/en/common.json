@@ -1,0 +1,58 @@
+{
+  "app": {
+    "titolo": "Derby Manager",
+    "sottotitolo": "Manage your derbies with ease"
+  },
+  "navigazione": {
+    "home": "Home",
+    "dashboard": "Dashboard",
+    "impostazioni": "Settings",
+    "profilo": "Profile",
+    "esci": "Logout"
+  },
+  "comune": {
+    "salva": "Save",
+    "annulla": "Cancel",
+    "elimina": "Delete",
+    "modifica": "Edit",
+    "crea": "Create",
+    "cerca": "Search",
+    "caricamento": "Loading...",
+    "errore": "Error",
+    "successo": "Success",
+    "conferma": "Confirm",
+    "indietro": "Back",
+    "avanti": "Next"
+  },
+  "lingua": {
+    "seleziona": "Select language",
+    "it": "Italian",
+    "en": "English",
+    "es": "Spanish",
+    "fr": "French"
+  },
+  "barraLaterale": {
+    "home": "Home",
+    "annunci": "Announcements",
+    "wiki": "Wiki",
+    "tutorial": "Tutorial",
+    "regolamenti": "Regulations",
+    "dashboard": "Dashboard",
+    "assegnazioni": "Assignments",
+    "listaGlobale": "Global List",
+    "blocchi": "Blocks",
+    "giocatori": "Players",
+    "gestione": "Management",
+    "edifici": "Buildings",
+    "città": "Cities",
+    "incarichi": "Tasks",
+    "cesti": "Baskets",
+    "derby": "Derby",
+    "statistiche": "Statistics",
+    "impostazioni": "Settings"
+  },
+  "azioni": {
+    "espandi": "Expand",
+    "comprimi": "Collapse"
+  }
+}

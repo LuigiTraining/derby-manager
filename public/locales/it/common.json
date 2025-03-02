@@ -1,0 +1,58 @@
+{
+  "app": {
+    "titolo": "Derby Manager",
+    "sottotitolo": "Gestisci i tuoi derby con facilità"
+  },
+  "navigazione": {
+    "home": "Home",
+    "dashboard": "Dashboard",
+    "impostazioni": "Impostazioni",
+    "profilo": "Profilo",
+    "esci": "Esci"
+  },
+  "comune": {
+    "salva": "Salva",
+    "annulla": "Annulla",
+    "elimina": "Elimina",
+    "modifica": "Modifica",
+    "crea": "Crea",
+    "cerca": "Cerca",
+    "caricamento": "Caricamento...",
+    "errore": "Errore",
+    "successo": "Successo",
+    "conferma": "Conferma",
+    "indietro": "Indietro",
+    "avanti": "Avanti"
+  },
+  "lingua": {
+    "seleziona": "Seleziona lingua",
+    "it": "Italiano",
+    "en": "Inglese",
+    "es": "Spagnolo",
+    "fr": "Francese"
+  },
+  "barraLaterale": {
+    "home": "Home",
+    "annunci": "Annunci",
+    "wiki": "Wiki",
+    "tutorial": "Tutorial",
+    "regolamenti": "Regolamenti",
+    "dashboard": "Dashboard",
+    "assegnazioni": "Assegnazioni",
+    "listaGlobale": "Lista globale",
+    "blocchi": "Blocchi",
+    "giocatori": "Giocatori",
+    "gestione": "Gestione",
+    "edifici": "Edifici",
+    "città": "Città",
+    "incarichi": "Incarichi",
+    "cesti": "Cesti",
+    "derby": "Derby",
+    "statistiche": "Statistiche",
+    "impostazioni": "Impostazioni"
+  },
+  "azioni": {
+    "espandi": "Espandi",
+    "comprimi": "Comprimi"
+  }
+}

@@ -96,18 +96,18 @@ export default function GestioneAssegnazioni() {
   const [filtroDerbyIncarichi, setFiltroDerbyIncarichi] = useState<
     string | null
   >(null); // Aggiungo questo stato
-  
+
   // Stati di ordinamento con inizializzazione da localStorage
   const [ordinamentoLivelloInverso, setOrdinamentoLivelloInverso] = useState(
     () => {
-    try {
+      try {
         return localStorage.getItem("ordinamentoLivelloInverso") === "true";
-    } catch {
-      return false;
-    }
+      } catch {
+        return false;
+      }
     }
   );
-  
+
   const [ordinamentoAlfabetico, setOrdinamentoAlfabetico] = useState(() => {
     try {
       return localStorage.getItem("ordinamentoAlfabetico") === "true";
@@ -115,16 +115,16 @@ export default function GestioneAssegnazioni() {
       return false;
     }
   });
-  
+
   const [ordinamentoAlfabeticoInverso, setOrdinamentoAlfabeticoInverso] =
     useState(() => {
-    try {
+      try {
         return localStorage.getItem("ordinamentoAlfabeticoInverso") === "true";
-    } catch {
-      return false;
-    }
-  });
-  
+      } catch {
+        return false;
+      }
+    });
+
   const [ordinamentoContatori, setOrdinamentoContatori] = useState(() => {
     try {
       return localStorage.getItem("ordinamentoContatori") === "true";
@@ -132,15 +132,15 @@ export default function GestioneAssegnazioni() {
       return false;
     }
   });
-  
+
   const [ordinamentoContatoriInverso, setOrdinamentoContatoriInverso] =
     useState(() => {
-    try {
+      try {
         return localStorage.getItem("ordinamentoContatoriInverso") === "true";
-    } catch {
-      return false;
-    }
-  });
+      } catch {
+        return false;
+      }
+    });
 
   // Effetti per salvare gli stati di ordinamento
   useEffect(() => {
@@ -198,7 +198,8 @@ export default function GestioneAssegnazioni() {
   const [cittaExpanded, setCittaExpanded] = useState<boolean>(false);
   const [incarichiExpanded, setIncarichiExpanded] = useState<boolean>(false);
   // Forza sempre a false all'avvio, ignorando eventuali valori salvati
-  const [filtriDerbyExpanded, setFiltriDerbyExpanded] = useState<boolean>(false);
+  const [filtriDerbyExpanded, setFiltriDerbyExpanded] =
+    useState<boolean>(false);
 
   // Aggiungiamo un effetto per salvare lo stato nel localStorage
   useEffect(() => {
@@ -212,7 +213,7 @@ export default function GestioneAssegnazioni() {
   } | null>(null);
   const [progressi, setProgressi] = useState<{ [key: string]: number }>({});
   const [searchQuery, setSearchQuery] = useState("");
-  
+
   // All'inizio del componente, dopo gli altri stati
   const [visualizzazioneGlobale, setVisualizzazioneGlobale] = useState(() => {
     try {
@@ -221,6 +222,9 @@ export default function GestioneAssegnazioni() {
       return false;
     }
   });
+
+  // Aggiungo uno stato per gestire la transizione tra le visualizzazioni
+  const [inTransizione, setInTransizione] = useState(false);
 
   // Stato per memorizzare i gruppi di incarichi
   const [gruppiIncarichi, setGruppiIncarichi] = useState<
@@ -232,8 +236,8 @@ export default function GestioneAssegnazioni() {
   // Funzione helper per la ricerca case-insensitive e gestione caratteri speciali
   const matchSearch = useCallback(
     (text: string | undefined | null) => {
-    if (!searchQuery) return true;
-    if (!text) return false;
+      if (!searchQuery) return true;
+      if (!text) return false;
       const normalizedText = text
         .toLowerCase()
         .normalize("NFD")
@@ -242,7 +246,7 @@ export default function GestioneAssegnazioni() {
         .toLowerCase()
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "");
-    return normalizedText.includes(normalizedQuery);
+      return normalizedText.includes(normalizedQuery);
     },
     [searchQuery]
   );
@@ -250,7 +254,7 @@ export default function GestioneAssegnazioni() {
   // Funzione per verificare se un incarico corrisponde alla ricerca
   const matchesSearch = useCallback(
     (incarico: Incarico) => {
-    return matchSearch(incarico.nome);
+      return matchSearch(incarico.nome);
     },
     [matchSearch]
   );
@@ -258,11 +262,11 @@ export default function GestioneAssegnazioni() {
   // Filtra i cesti in base alla ricerca
   const cestiFiltrati = useMemo(() => {
     if (!searchQuery) return cesti;
-    
+
     return cesti.filter((cesto) => {
       // Controlla se il nome del cesto corrisponde alla ricerca
       if (matchSearch(cesto.nome)) return true;
-      
+
       // Controlla se uno degli incarichi nel cesto corrisponde alla ricerca
       return cesto.incarichi.some((inc) => {
         const incarico = incarichi.find((i) => i.id === inc.incarico_id);
@@ -391,7 +395,7 @@ export default function GestioneAssegnazioni() {
         const giocatoriQuery = query(collection(db, "utenti"));
         const giocatoriSnapshot = await getDocs(giocatoriQuery);
         const farmsData: Farm[] = [];
-        
+
         giocatoriSnapshot.docs.forEach((doc) => {
           const giocatore = doc.data();
           // Verifica che sia un giocatore o un moderatore e non un admin
@@ -415,7 +419,7 @@ export default function GestioneAssegnazioni() {
             });
           }
         });
-        
+
         // Ordina le farm per nome del giocatore
         farmsData.sort((a, b) => {
           const nomeA = a.giocatore_nome || "";
@@ -430,8 +434,8 @@ export default function GestioneAssegnazioni() {
         const cestiData = cestiSnapshot.docs.map(
           (doc) =>
             ({
-          id: doc.id,
-          ...doc.data(),
+              id: doc.id,
+              ...doc.data(),
               data_creazione: doc.data().data_creazione?.toDate() || new Date(),
             } as Cesto)
         );
@@ -498,11 +502,14 @@ export default function GestioneAssegnazioni() {
   // Salva la modalità di visualizzazione quando cambia
   useEffect(() => {
     try {
+      // Imposta lo stato di transizione a true
+      setInTransizione(true);
+
       localStorage.setItem(
         "visualizzazioneGlobale",
         String(visualizzazioneGlobale)
       );
-      
+
       // Se passiamo alla modalità globale, salviamo lo stato precedente degli edifici
       if (visualizzazioneGlobale) {
         localStorage.setItem(
@@ -530,11 +537,17 @@ export default function GestioneAssegnazioni() {
           setExpandedEdifici(JSON.parse(savedPreGlobale));
         }
       }
+
+      // Dopo un breve ritardo, imposta lo stato di transizione a false
+      setTimeout(() => {
+        setInTransizione(false);
+      }, 300);
     } catch (error) {
       console.error(
         "Errore nel salvataggio della modalità di visualizzazione:",
         error
       );
+      setInTransizione(false);
     }
   }, [visualizzazioneGlobale]);
 
@@ -563,7 +576,7 @@ export default function GestioneAssegnazioni() {
         where("riferimento_id", "==", incaricoId),
         where("tipo", "==", "incarico")
       );
-      
+
       const progressiSnapshot = await getDocs(progressiQuery);
       if (!progressiSnapshot.empty) {
         return progressiSnapshot.docs[0].data().quantita || 0;
@@ -582,13 +595,13 @@ export default function GestioneAssegnazioni() {
     const incarico = incarichi.find((i) => i.id === incaricoId);
     if (!incarico)
       return {
-      totaleAttive: 0,
-      totaleInattive: 0,
-      completateAttive: 0,
-      completateInattive: 0,
-      completateSenzaAssegnazioneAttive: 0,
+        totaleAttive: 0,
+        totaleInattive: 0,
+        completateAttive: 0,
+        completateInattive: 0,
+        completateSenzaAssegnazioneAttive: 0,
         completateSenzaAssegnazioneInattive: 0,
-    };
+      };
 
     // Conta le assegnazioni
     const assegnazioniIncarico = assegnazioni.filter(
@@ -619,31 +632,31 @@ export default function GestioneAssegnazioni() {
     // Conta i completamenti per tutte le farm
     await Promise.all(
       farms.map(async (farm) => {
-      const progresso = await getProgressoIncaricoFarm(incaricoId, farm.id);
+        const progresso = await getProgressoIncaricoFarm(incaricoId, farm.id);
         const completamenti = getCompletamentiIncarico(
           progresso,
           getQuantitaIncarico(incarico)
         );
-      
-      if (completamenti > 0) {
+
+        if (completamenti > 0) {
           const haAssegnazione = assegnazioniIncarico.some(
             (a) => a.farm_id === farm.id
           );
-        
-        if (farm.isAttiva) {
-          if (haAssegnazione) {
-            conteggi.completateAttive += completamenti;
+
+          if (farm.isAttiva) {
+            if (haAssegnazione) {
+              conteggi.completateAttive += completamenti;
+            } else {
+              conteggi.completateSenzaAssegnazioneAttive += completamenti;
+            }
           } else {
-            conteggi.completateSenzaAssegnazioneAttive += completamenti;
-          }
-        } else {
-          if (haAssegnazione) {
-            conteggi.completateInattive += completamenti;
-          } else {
-            conteggi.completateSenzaAssegnazioneInattive += completamenti;
+            if (haAssegnazione) {
+              conteggi.completateInattive += completamenti;
+            } else {
+              conteggi.completateSenzaAssegnazioneInattive += completamenti;
+            }
           }
         }
-      }
       })
     );
 
@@ -655,7 +668,7 @@ export default function GestioneAssegnazioni() {
     IncarichiPerEdificio[]
   > => {
     const gruppi: { [key: string]: IncarichiPerEdificio } = {};
-    
+
     // Filtra gli incarichi in base alla ricerca e al derby selezionato
     const incarichiFiltrati = incarichi.filter((inc) => {
       // Applica il filtro di ricerca
@@ -668,7 +681,7 @@ export default function GestioneAssegnazioni() {
 
       return matchesSearch && matchesDerby;
     });
-    
+
     if (visualizzazioneGlobale) {
       gruppi["tutti"] = {
         edificio_id: "tutti",
@@ -697,8 +710,8 @@ export default function GestioneAssegnazioni() {
 
     const incarichiConConteggi = await Promise.all(
       incarichiFiltrati.map(async (incarico) => {
-      const conteggi = await calcolaConteggi(incarico.id);
-      const giocatoriAssegnati = assegnazioni
+        const conteggi = await calcolaConteggi(incarico.id);
+        const giocatoriAssegnati = assegnazioni
           .filter(
             (a) => a.tipo === "incarico" && a.riferimento_id === incarico.id
           )
@@ -706,22 +719,22 @@ export default function GestioneAssegnazioni() {
             const farm = farms.find((f) => f.id === ass.farm_id);
             if (!farm || !farm.giocatore_id || !farm.giocatore_nome)
               return null;
-          return {
-            giocatore_id: farm.giocatore_id,
-            nome_giocatore: farm.giocatore_nome,
-            farm_id: farm.id,
-            nome_farm: farm.nome,
-            isAttiva: farm.isAttiva,
+            return {
+              giocatore_id: farm.giocatore_id,
+              nome_giocatore: farm.giocatore_nome,
+              farm_id: farm.id,
+              nome_farm: farm.nome,
+              isAttiva: farm.isAttiva,
               completato: ass.completato,
-          };
-        })
-        .filter((g): g is NonNullable<typeof g> => g !== null);
+            };
+          })
+          .filter((g): g is NonNullable<typeof g> => g !== null);
 
-      return {
+        return {
           incarico, // Usa l'oggetto incarico completo invece di crearne uno nuovo
-        conteggi,
+          conteggi,
           giocatori_assegnati: giocatoriAssegnati,
-      };
+        };
       })
     );
 
@@ -736,18 +749,18 @@ export default function GestioneAssegnazioni() {
             a.conteggi.completateAttive + a.conteggi.completateInattive;
           const completamentiB =
             b.conteggi.completateAttive + b.conteggi.completateInattive;
-          
+
           const confronto = ordinamentoContatoriInverso
             ? totaleB - totaleA || completamentiB - completamentiA
             : totaleA - totaleB || completamentiA - completamentiB;
-          
+
           return confronto || a.incarico.nome.localeCompare(b.incarico.nome);
         } else if (ordinamentoAlfabetico) {
-          return ordinamentoAlfabeticoInverso 
+          return ordinamentoAlfabeticoInverso
             ? b.incarico.nome.localeCompare(a.incarico.nome)
             : a.incarico.nome.localeCompare(b.incarico.nome);
         } else {
-          const compareLivello = ordinamentoLivelloInverso 
+          const compareLivello = ordinamentoLivelloInverso
             ? b.incarico.livello_minimo - a.incarico.livello_minimo
             : a.incarico.livello_minimo - b.incarico.livello_minimo;
           return (
@@ -777,18 +790,18 @@ export default function GestioneAssegnazioni() {
               a.conteggi.completateAttive + a.conteggi.completateInattive;
             const completamentiB =
               b.conteggi.completateAttive + b.conteggi.completateInattive;
-            
+
             const confronto = ordinamentoContatoriInverso
               ? totaleB - totaleA || completamentiB - completamentiA
               : totaleA - totaleB || completamentiA - completamentiB;
-            
+
             return confronto || a.incarico.nome.localeCompare(b.incarico.nome);
           } else if (ordinamentoAlfabetico) {
-            return ordinamentoAlfabeticoInverso 
+            return ordinamentoAlfabeticoInverso
               ? b.incarico.nome.localeCompare(a.incarico.nome)
               : a.incarico.nome.localeCompare(b.incarico.nome);
           } else {
-            const compareLivello = ordinamentoLivelloInverso 
+            const compareLivello = ordinamentoLivelloInverso
               ? b.incarico.livello_minimo - a.incarico.livello_minimo
               : a.incarico.livello_minimo - b.incarico.livello_minimo;
             return (
@@ -840,7 +853,7 @@ export default function GestioneAssegnazioni() {
       .map((i) => incarichi.find((inc) => inc.id === i.incarico_id))
       .filter((i): i is Incarico => i !== undefined)
       .map((i) => i.livello_minimo);
-    
+
     return Math.max(...livelliIncarichi);
   };
 
@@ -868,8 +881,8 @@ export default function GestioneAssegnazioni() {
             const incarico = incarichi.find(
               (i) => i.id === incaricoInCesto.incarico_id
             );
-          if (!incarico) return 0;
-          const progresso = getProgressoIncarico(incarico.id, farm.id);
+            if (!incarico) return 0;
+            const progresso = getProgressoIncarico(incarico.id, farm.id);
             return getCompletamentiIncarico(
               progresso,
               getQuantitaIncaricoCesto(cesto.id, incarico.id)
@@ -907,7 +920,7 @@ export default function GestioneAssegnazioni() {
       let assegnazioniData = assegnazioniSnapshot.docs.map(
         (doc) =>
           ({
-        id: doc.id,
+            id: doc.id,
             ...doc.data(),
           } as Assegnazione)
       );
@@ -978,8 +991,8 @@ export default function GestioneAssegnazioni() {
           const assegnazioneCesto = assegnazioni.find(
             (a) =>
               a.tipo === "cesto" &&
-            a.riferimento_id === cesto.id &&
-            a.farm_id === assegnazione.farm_id
+              a.riferimento_id === cesto.id &&
+              a.farm_id === assegnazione.farm_id
           );
 
           if (assegnazioneCesto) {
@@ -994,7 +1007,7 @@ export default function GestioneAssegnazioni() {
           const assegnazioniIncarichi = assegnazioni.filter(
             (a) =>
               a.tipo === "incarico" &&
-            a.farm_id === assegnazione.farm_id &&
+              a.farm_id === assegnazione.farm_id &&
               cesto.incarichi.some((i) => i.incarico_id === a.riferimento_id)
           );
 
@@ -1003,7 +1016,7 @@ export default function GestioneAssegnazioni() {
             assegnazioniDaRimuovere.add(a.id)
           );
         }
-        
+
         // Poi aggiungi l'assegnazione del cesto
         assegnazioniDaRimuovere.add(assegnazioneId);
       }
@@ -1013,7 +1026,7 @@ export default function GestioneAssegnazioni() {
         (a, b) => {
           const assA = assegnazioni.find((ass) => ass.id === a);
           const assB = assegnazioni.find((ass) => ass.id === b);
-        // Gli incarichi vengono prima dei cesti
+          // Gli incarichi vengono prima dei cesti
           return (
             (assA?.tipo === "incarico" ? 0 : 1) -
             (assB?.tipo === "incarico" ? 0 : 1)
@@ -1054,8 +1067,8 @@ export default function GestioneAssegnazioni() {
 
     return farms.filter(
       (farm) =>
-      !farmAssegnate.includes(farm.farmId) && 
-      farm.livello >= incarico.livello_minimo
+        !farmAssegnate.includes(farm.farmId) &&
+        farm.livello >= incarico.livello_minimo
     );
   };
 
@@ -1066,8 +1079,8 @@ export default function GestioneAssegnazioni() {
       const assegnazioneEsistente = assegnazioni.find(
         (a) =>
           a.tipo === "incarico" &&
-            a.riferimento_id === incaricoId && 
-            a.farm_id === farmId
+          a.riferimento_id === incaricoId &&
+          a.farm_id === farmId
       );
 
       if (assegnazioneEsistente) {
@@ -1076,7 +1089,7 @@ export default function GestioneAssegnazioni() {
       }
 
       const nuovaAssegnazione: Omit<Assegnazione, "id"> = {
-        farm_id: farmId, 
+        farm_id: farmId,
         tipo: "incarico",
         riferimento_id: incaricoId,
         completato: false,
@@ -1126,8 +1139,8 @@ export default function GestioneAssegnazioni() {
       const assegnazioniCesto = assegnazioni.filter(
         (a) =>
           a.tipo === "cesto" &&
-            a.riferimento_id === cestoId && 
-            a.farm_id === farmId
+          a.riferimento_id === cestoId &&
+          a.farm_id === farmId
       );
 
       if (assegnazioniCesto.length > 0) {
@@ -1150,8 +1163,8 @@ export default function GestioneAssegnazioni() {
         const esisteAssegnazione = assegnazioni.some(
           (a) =>
             a.tipo === "incarico" &&
-          a.riferimento_id === inc.incarico_id && 
-          a.farm_id === farmId
+            a.riferimento_id === inc.incarico_id &&
+            a.farm_id === farmId
         );
 
         if (!esisteAssegnazione) {
@@ -1167,13 +1180,13 @@ export default function GestioneAssegnazioni() {
 
       // Salva tutte le assegnazioni in una batch
       const batch = writeBatch(db);
-      
+
       // Aggiungi l'assegnazione del cesto
       const cestoRef = doc(collection(db, "assegnazioni"));
       batch.set(cestoRef, nuovaAssegnazioneCesto);
 
       // Aggiungi solo le nuove assegnazioni degli incarichi
-      const nuoveAssegnazioniRefs = nuoveAssegnazioniIncarichi.map(() => 
+      const nuoveAssegnazioniRefs = nuoveAssegnazioniIncarichi.map(() =>
         doc(collection(db, "assegnazioni"))
       );
       nuoveAssegnazioniIncarichi.forEach((assegnazione, index) => {
@@ -1213,13 +1226,13 @@ export default function GestioneAssegnazioni() {
       const assegnazioniCorrelate = assegnazioni.filter(
         (a) =>
           a.tipo === "incarico" &&
-            a.farm_id === assegnazioneCesto.farm_id && 
+          a.farm_id === assegnazioneCesto.farm_id &&
           cesto.incarichi.some((i) => i.incarico_id === a.riferimento_id)
       );
 
       // Rimuovi tutte le assegnazioni in batch
       const batch = writeBatch(db);
-      
+
       // Rimuovi l'assegnazione del cesto
       batch.delete(doc(db, "assegnazioni", assegnazioneId));
 
@@ -1234,7 +1247,7 @@ export default function GestioneAssegnazioni() {
       setAssegnazioni((prev) =>
         prev.filter(
           (a) =>
-        a.id !== assegnazioneId && 
+            a.id !== assegnazioneId &&
             !assegnazioniCorrelate.some((ac) => ac.id === a.id)
         )
       );
@@ -1249,8 +1262,8 @@ export default function GestioneAssegnazioni() {
     const cestoAssegnato = assegnazioni.some(
       (a) =>
         a.tipo === "cesto" &&
-      a.riferimento_id === cesto.id && 
-      a.farm_id === farmId
+        a.riferimento_id === cesto.id &&
+        a.farm_id === farmId
     );
 
     // Se il cesto è già assegnato, non considerarlo completo
@@ -1261,8 +1274,8 @@ export default function GestioneAssegnazioni() {
       assegnazioni.some(
         (a) =>
           a.tipo === "incarico" &&
-        a.riferimento_id === inc.incarico_id && 
-        a.farm_id === farmId
+          a.riferimento_id === inc.incarico_id &&
+          a.farm_id === farmId
       )
     );
 
@@ -1296,7 +1309,7 @@ export default function GestioneAssegnazioni() {
 
             const cestoRef = doc(collection(db, "assegnazioni"));
             batch.set(cestoRef, nuovaAssegnazioneCesto);
-            
+
             nuoveAssegnazioni.push({
               id: cestoRef.id,
               ...nuovaAssegnazioneCesto,
@@ -1344,55 +1357,46 @@ export default function GestioneAssegnazioni() {
 
   // Funzione per scrollare e evidenziare un incarico
   const scrollToIncarico = (incaricoId: string) => {
-    console.log("scrollToIncarico chiamato con ID:", incaricoId);
-
-    // Espandi la sezione città se l'incarico è un incarico città
+    // Cerca l'incarico
+    const incarico = incarichi.find((i) => i.id === incaricoId);
     const incaricoInCitta = incarichiCitta.find((inc) => inc.id === incaricoId);
-    console.log("Incarico in città trovato:", incaricoInCitta);
-    
-    if (incaricoInCitta) {
-      console.log("Espando la sezione città");
+
+    if (visualizzazioneGlobale) {
+      // Se siamo in visualizzazione globale, espandi l'header "Tutti gli incarichi"
+      if (!expandedEdifici.includes("tutti")) {
+        setExpandedEdifici((prev) => [...prev, "tutti"]);
+      }
+    } else if (incarico?.edificio_id) {
+      // Se l'incarico appartiene a un edificio, espandi l'edificio
+      setExpandedEdifici((prev) =>
+        prev.includes(incarico.edificio_id!)
+          ? prev
+          : [...prev, incarico.edificio_id!]
+      );
+    } else if (incaricoInCitta) {
+      // Se è un incarico città, espandi la sezione città
       setCittaExpanded(true);
     }
 
     // Aspetta che il DOM si aggiorni dopo l'espansione
     setTimeout(() => {
-      // Costruisci l'ID corretto in base al tipo di incarico
       const elementId = incaricoInCitta
         ? `citta_${incaricoId}`
         : `incarico-${incaricoId}`;
-      console.log("Cercando elemento con ID:", elementId);
-      
-      // Trova l'elemento
       const element = document.getElementById(elementId);
-      console.log("Elemento trovato:", element);
-
       if (element) {
-        // Trova il container più vicino con role="row"
-        const boxContainer = element.closest('[role="row"]') as HTMLElement;
-        console.log('Container con role="row" trovato:', boxContainer);
-
-        // Elemento target per l'highlight (usa il container se trovato, altrimenti l'elemento stesso)
-        const targetElement = (boxContainer || element) as HTMLElement;
-        console.log("Elemento target per highlight:", targetElement);
-
-        // Scroll all'elemento
         element.scrollIntoView({ behavior: "smooth", block: "center" });
 
         // Applica l'highlight
-        targetElement.style.transition = "background-color 0.5s";
-        targetElement.style.backgroundColor = "#ffeb3b";
-        console.log("Highlight applicato");
+        element.style.transition = "background-color 0.5s";
+        element.style.backgroundColor = "#ffeb3b";
 
-        // Rimuovi l'highlight dopo 1 secondo
+        // Rimuovi l'highlight dopo 3 secondi
         setTimeout(() => {
-          targetElement.style.backgroundColor = "";
-          console.log("Highlight rimosso");
-        }, 1000);
-      } else {
-        console.log("Elemento non trovato nel DOM");
+          element.style.backgroundColor = "";
+        }, 3000);
       }
-    }, 300);
+    }, 100);
   };
 
   // Funzione per scrollare e evidenziare un cesto
@@ -1405,19 +1409,19 @@ export default function GestioneAssegnazioni() {
     // Aspetta che il DOM si aggiorni dopo l'espansione
     setTimeout(
       () => {
-      const element = document.getElementById(`cesto-${cestoId}`);
-      if (element) {
-        // Scroll all'elemento
+        const element = document.getElementById(`cesto-${cestoId}`);
+        if (element) {
+          // Scroll all'elemento
           element.scrollIntoView({ behavior: "smooth", block: "center" });
-        
-        // Aggiungi effetto flash direttamente al Box
+
+          // Aggiungi effetto flash direttamente al Box
           element.style.backgroundColor = "#fff176";
-        
-        // Rimuovi l'effetto dopo 1 secondo
-        setTimeout(() => {
+
+          // Rimuovi l'effetto dopo 1 secondo
+          setTimeout(() => {
             element.style.backgroundColor = "";
-        }, 1000);
-      }
+          }, 3000);
+        }
       },
       cestiExpanded ? 100 : 300
     ); // Aumentiamo il timeout se i cesti erano chiusi
@@ -1521,7 +1525,7 @@ export default function GestioneAssegnazioni() {
           progresso,
           getQuantitaIncaricoCitta(incarico)
         );
-        
+
         if (farm.isAttiva) {
           conteggi.attive++;
           if (completamenti > 0) {
@@ -1547,7 +1551,7 @@ export default function GestioneAssegnazioni() {
           progresso,
           getQuantitaIncaricoCitta(incarico)
         );
-        
+
         if (completamenti > 0) {
           if (farm.isAttiva) {
             conteggi.completateSenzaAssegnazioneAttive += completamenti;
@@ -1614,15 +1618,17 @@ export default function GestioneAssegnazioni() {
   const calcolaLivelloCesto = (incarichiIds: { incarico_id: string }[]) => {
     if (!incarichiIds || incarichiIds.length === 0) return 1;
 
-    const livelli = incarichiIds.map(inc => {
+    const livelli = incarichiIds.map((inc) => {
       // Prima cerca tra gli incarichi standard
-      const incaricoStandard = incarichi.find(i => i.id === inc.incarico_id);
+      const incaricoStandard = incarichi.find((i) => i.id === inc.incarico_id);
       if (incaricoStandard) {
         return incaricoStandard.livello_minimo;
       }
 
       // Se non è un incarico standard, cerca tra gli incarichi città
-      const incaricoInCitta = incarichiCitta.find(i => i.id === inc.incarico_id);
+      const incaricoInCitta = incarichiCitta.find(
+        (i) => i.id === inc.incarico_id
+      );
       if (incaricoInCitta) {
         return incaricoInCitta.livello_minimo;
       }
@@ -1643,15 +1649,24 @@ export default function GestioneAssegnazioni() {
     );
   }
 
+  // Modifica la funzione che gestisce il cambio di visualizzazione
+  const handleToggleVisualizzazione = () => {
+    if (!inTransizione) {
+      setVisualizzazioneGlobale(!visualizzazioneGlobale);
+    }
+  };
+
   return (
     <Layout>
       {/* Barra di ricerca con filtri derby */}
-      <Box sx={{ 
-        mb: 3,
-        display: 'flex',
-        gap: 1,
-        alignItems: 'flex-start'
-      }}>
+      <Box
+        sx={{
+          mb: 3,
+          display: "flex",
+          gap: 1,
+          alignItems: "flex-start",
+        }}
+      >
         {/* Pulsante Filtri Derby */}
         <Box>
           <Tooltip title="Filtri Derby">
@@ -1661,24 +1676,26 @@ export default function GestioneAssegnazioni() {
               size="small"
               sx={{
                 border: 1,
-                borderColor: filtriDerbyExpanded ? 'primary.main' : 'divider',
-                bgcolor: filtriDerbyExpanded ? 'primary.lighter' : 'background.paper',
+                borderColor: filtriDerbyExpanded ? "primary.main" : "divider",
+                bgcolor: filtriDerbyExpanded
+                  ? "primary.lighter"
+                  : "background.paper",
               }}
             >
               <FilterListIcon fontSize="small" />
             </IconButton>
           </Tooltip>
-          
+
           <Collapse in={filtriDerbyExpanded}>
-            <Paper 
-              sx={{ 
+            <Paper
+              sx={{
                 mt: 1,
                 p: 2,
-                position: 'absolute',
+                position: "absolute",
                 zIndex: 1000,
-                width: 'max-content',
-                maxWidth: '90vw',
-                boxShadow: 3
+                width: "max-content",
+                maxWidth: "90vw",
+                boxShadow: 3,
               }}
             >
               <Grid container spacing={2} sx={{ minWidth: { sm: 600 } }}>
@@ -1700,15 +1717,18 @@ export default function GestioneAssegnazioni() {
                       ))}
                     </Select>
                   </FormControl>
-                  <Box sx={{ 
-                    mt: 1, 
-                    p: 1, 
-                    bgcolor: 'grey.100', 
-                    borderRadius: 1,
-                    fontSize: '0.75rem',
-                    color: 'text.secondary'
-                  }}>
-                    Mostra gli incarichi fatti ai giocatori per il tipo di derby che selezionerai
+                  <Box
+                    sx={{
+                      mt: 1,
+                      p: 1,
+                      bgcolor: "grey.100",
+                      borderRadius: 1,
+                      fontSize: "0.75rem",
+                      color: "text.secondary",
+                    }}
+                  >
+                    Mostra gli incarichi fatti ai giocatori per il tipo di derby
+                    che selezionerai
                   </Box>
                 </Grid>
 
@@ -1730,15 +1750,18 @@ export default function GestioneAssegnazioni() {
                       ))}
                     </Select>
                   </FormControl>
-                  <Box sx={{ 
-                    mt: 1, 
-                    p: 1, 
-                    bgcolor: 'grey.100', 
-                    borderRadius: 1,
-                    fontSize: '0.75rem',
-                    color: 'text.secondary'
-                  }}>
-                    Questo filtro mostrerà solo gli incarichi di appartenenza per il derby che selezionerai
+                  <Box
+                    sx={{
+                      mt: 1,
+                      p: 1,
+                      bgcolor: "grey.100",
+                      borderRadius: 1,
+                      fontSize: "0.75rem",
+                      color: "text.secondary",
+                    }}
+                  >
+                    Questo filtro mostrerà solo gli incarichi di appartenenza
+                    per il derby che selezionerai
                   </Box>
                 </Grid>
 
@@ -1760,15 +1783,18 @@ export default function GestioneAssegnazioni() {
                       ))}
                     </Select>
                   </FormControl>
-                  <Box sx={{ 
-                    mt: 1, 
-                    p: 1, 
-                    bgcolor: 'grey.100', 
-                    borderRadius: 1,
-                    fontSize: '0.75rem',
-                    color: 'text.secondary'
-                  }}>
-                    Aggiorna le quantità degli incarichi in base al derby selezionato
+                  <Box
+                    sx={{
+                      mt: 1,
+                      p: 1,
+                      bgcolor: "grey.100",
+                      borderRadius: 1,
+                      fontSize: "0.75rem",
+                      color: "text.secondary",
+                    }}
+                  >
+                    Aggiorna le quantità degli incarichi in base al derby
+                    selezionato
                   </Box>
                 </Grid>
               </Grid>
@@ -1801,11 +1827,11 @@ export default function GestioneAssegnazioni() {
               </InputAdornment>
             ),
             sx: {
-              bgcolor: 'background.paper',
-              '&:hover': {
-                bgcolor: 'background.paper',
-              }
-            }
+              bgcolor: "background.paper",
+              "&:hover": {
+                bgcolor: "background.paper",
+              },
+            },
           }}
         />
       </Box>
@@ -1841,7 +1867,7 @@ export default function GestioneAssegnazioni() {
           >
             <Box
               onClick={() => setCestiExpanded(!cestiExpanded)}
-              sx={{ 
+              sx={{
                 display: "flex",
                 alignItems: "center",
                 p: 0.5, // Aumentato da 0.25 a 0.5
@@ -1855,11 +1881,11 @@ export default function GestioneAssegnazioni() {
                 height: 36, // Aumentato da 32 a 36
               }}
             >
-              <Avatar 
-                src="/images/cesto.png" 
+              <Avatar
+                src="/images/cesto.png"
                 alt="Cesti"
                 variant="rounded"
-                sx={{ 
+                sx={{
                   width: 28, // Aumentato da 24 a 28
                   height: 28, // Aumentato da 24 a 28
                   bgcolor: "transparent",
@@ -1870,7 +1896,9 @@ export default function GestioneAssegnazioni() {
                 }}
               />
               <Box sx={{ flexGrow: 1, display: "flex", alignItems: "center" }}>
-                <Typography variant="caption" sx={{ fontWeight: 500 }}> {/* Cambiato da subtitle2 a caption */}
+                <Typography variant="caption" sx={{ fontWeight: 500 }}>
+                  {" "}
+                  {/* Cambiato da subtitle2 a caption */}
                   Cesti
                 </Typography>
                 <Typography
@@ -1882,9 +1910,9 @@ export default function GestioneAssegnazioni() {
                   {cestiFiltrati.length === 1 ? "cesto" : "cesti"}
                 </Typography>
               </Box>
-              <IconButton 
+              <IconButton
                 size="small"
-                sx={{ 
+                sx={{
                   transform: cestiExpanded ? "rotate(180deg)" : "none",
                   transition: "transform 0.2s",
                   width: 20, // Ridotto
@@ -1892,15 +1920,16 @@ export default function GestioneAssegnazioni() {
                   p: 0, // Rimuove il padding
                 }}
               >
-                <ExpandMoreIcon sx={{ fontSize: 16 }} /> {/* Ridotto ulteriormente */}
+                <ExpandMoreIcon sx={{ fontSize: 16 }} />{" "}
+                {/* Ridotto ulteriormente */}
               </IconButton>
             </Box>
           </Box>
 
           {/* Lista dei cesti */}
-          <Paper 
+          <Paper
             elevation={0}
-            sx={{ 
+            sx={{
               mb: 0, // Cambiato da 1 a 0 per rimuovere lo spazio tra le sezioni
               border: 1,
               borderColor: "divider",
@@ -1935,7 +1964,7 @@ export default function GestioneAssegnazioni() {
                         sx={{
                           display: "flex",
                           flexDirection: "column",
-                        gap: 0,
+                          gap: 0,
                           mr: 0,
                         }}
                       >
@@ -1943,17 +1972,23 @@ export default function GestioneAssegnazioni() {
                           <Chip
                             label={`${conteggi.attive}/${conteggi.completateAttive}`}
                             size="small"
-                            sx={{ 
-                              height: 16,  
+                            sx={{
+                              height: 16,
                               minWidth: "auto",
-                              bgcolor: conteggi.attive === 0 ? "rgb(0, 0, 0, 0.03)" : "rgb(33, 150, 243, 0.1)",
-                              color: conteggi.attive === 0 ? "rgb(0, 0, 0, 0.6)" : "rgb(33, 150, 243)",
+                              bgcolor:
+                                conteggi.attive === 0
+                                  ? "rgb(0, 0, 0, 0.03)"
+                                  : "rgb(33, 150, 243, 0.1)",
+                              color:
+                                conteggi.attive === 0
+                                  ? "rgb(0, 0, 0, 0.6)"
+                                  : "rgb(33, 150, 243)",
                               "& .MuiChip-label": {
                                 px: 1,
-                                fontSize: "0.65rem",  // Font size fisso
-                                lineHeight: 1,  // Aggiungo line-height fisso
-                                fontWeight: 400  // Aggiungo font-weight fisso
-                              }
+                                fontSize: "0.65rem", // Font size fisso
+                                lineHeight: 1, // Aggiungo line-height fisso
+                                fontWeight: 400, // Aggiungo font-weight fisso
+                              },
                             }}
                             onClick={() => {
                               if (conteggi.attive > 0) {
@@ -1971,17 +2006,17 @@ export default function GestioneAssegnazioni() {
                           <Chip
                             label={`${conteggi.inattive}/${conteggi.completateInattive}`}
                             size="small"
-                            sx={{ 
-                              height: 16,  // Riduco l'altezza da 20 a 16
+                            sx={{
+                              height: 16, // Riduco l'altezza da 20 a 16
                               minWidth: "auto",
                               bgcolor: "rgb(0, 0, 0, 0.03)",
                               color: "rgb(0, 0, 0, 0.6)",
                               "& .MuiChip-label": {
                                 px: 1,
-                                fontSize: "0.65rem",  // Font size fisso
-                                lineHeight: 1,  // Aggiungo line-height fisso
-                                fontWeight: 400  // Aggiungo font-weight fisso
-                              }
+                                fontSize: "0.65rem", // Font size fisso
+                                lineHeight: 1, // Aggiungo line-height fisso
+                                fontWeight: 400, // Aggiungo font-weight fisso
+                              },
                             }}
                             onClick={() => {
                               if (conteggi.inattive > 0) {
@@ -1999,7 +2034,7 @@ export default function GestioneAssegnazioni() {
 
                       {/* Area cliccabile per assegnare il cesto */}
                       <Box
-                        sx={{ 
+                        sx={{
                           display: "flex",
                           alignItems: "center",
                           flexGrow: 1,
@@ -2010,24 +2045,24 @@ export default function GestioneAssegnazioni() {
                         {/* Strisciolina del livello */}
                         <Box
                           sx={{
-                            position: 'absolute',
+                            position: "absolute",
                             left: 0,
                             top: 0,
                             bottom: 0,
-                            width: '24px',
-                            bgcolor: 'rgb(33, 150, 243, 0.1)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
+                            width: "24px",
+                            bgcolor: "rgb(33, 150, 243, 0.1)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
                           }}
                         >
-                          <Typography 
-                            sx={{ 
-                              fontSize: '0.75rem',
-                              fontStyle: 'italic',
-                              color: 'rgb(33, 150, 243)',
-                              width: '3ch',
-                              textAlign: 'center'
+                          <Typography
+                            sx={{
+                              fontSize: "0.55rem",
+                              fontStyle: "italic",
+                              color: "rgb(33, 150, 243)",
+                              width: "3ch",
+                              textAlign: "center",
                             }}
                           >
                             {calcolaLivelloCesto(cesto.incarichi)}
@@ -2044,7 +2079,7 @@ export default function GestioneAssegnazioni() {
                           }}
                         >
                           {/* Immagini incarichi */}
-                          <Box sx={{ display: "flex", gap: 0.5, mr: 2 }}>
+                          <Box sx={{ display: "flex", gap: 0.5, mr: 1.5 }}>
                             {cesto.incarichi.map((incaricoInCesto) => {
                               // Cerca prima tra gli incarichi standard
                               let incarico = incarichi.find(
@@ -2080,9 +2115,9 @@ export default function GestioneAssegnazioni() {
                                   <Avatar
                                     src={incarico.immagine}
                                     variant="rounded"
-                                    sx={{ 
-                                      width: 32, 
-                                      height: 32,
+                                    sx={{
+                                      width: 28,
+                                      height: 28,
                                       cursor: "pointer",
                                       "&:hover": {
                                         opacity: 0.8,
@@ -2097,16 +2132,16 @@ export default function GestioneAssegnazioni() {
                                   </Avatar>
                                   <Typography
                                     variant="caption"
-                                    sx={{ 
+                                    sx={{
                                       position: "absolute",
-                                      bottom: -8,
+                                      bottom: -5,
                                       right: -8,
                                       bgcolor: "background.paper",
                                       border: 1,
                                       borderColor: "divider",
                                       borderRadius: 1,
                                       px: 0.5,
-                                      fontSize: "0.75rem",
+                                      fontSize: "0.55rem",
                                     }}
                                   >
                                     x
@@ -2131,10 +2166,10 @@ export default function GestioneAssegnazioni() {
                           >
                             <Typography
                               variant="body2"
-                              sx={{ 
+                              sx={{
                                 wordBreak: "break-word",
                                 lineHeight: 1.1,
-                                fontSize: "0.875rem",
+                                fontSize: "0.75rem",
                               }}
                             >
                               {cesto.nome}
@@ -2148,7 +2183,7 @@ export default function GestioneAssegnazioni() {
                                   element: event.currentTarget,
                                 });
                               }}
-                              sx={{ 
+                              sx={{
                                 ml: "auto",
                                 width: 28,
                                 height: 28,
@@ -2232,7 +2267,7 @@ export default function GestioneAssegnazioni() {
                                             width: 20,
                                             height: 20,
                                             borderRadius: "50%",
-                                            ...(giocatore.completato 
+                                            ...(giocatore.completato
                                               ? { bgcolor: "rgb(33, 150, 243)" }
                                               : {
                                                   border:
@@ -2258,7 +2293,7 @@ export default function GestioneAssegnazioni() {
                                               "cesto"
                                             );
                                           }}
-                                          sx={{ 
+                                          sx={{
                                             ml: "auto",
                                             width: 20,
                                             height: 20,
@@ -2321,7 +2356,7 @@ export default function GestioneAssegnazioni() {
                                             width: 20,
                                             height: 20,
                                             borderRadius: "50%",
-                                            ...(giocatore.completato 
+                                            ...(giocatore.completato
                                               ? {
                                                   bgcolor: "rgba(0, 0, 0, 0.2)",
                                                 }
@@ -2352,7 +2387,7 @@ export default function GestioneAssegnazioni() {
                                               "cesto"
                                             );
                                           }}
-                                          sx={{ 
+                                          sx={{
                                             ml: "auto",
                                             width: 20,
                                             height: 20,
@@ -2398,7 +2433,7 @@ export default function GestioneAssegnazioni() {
           >
             <Box
               onClick={() => setCittaExpanded(!cittaExpanded)}
-              sx={{ 
+              sx={{
                 display: "flex",
                 alignItems: "center",
                 p: 0.5, // Aumentato da 0.25 a 0.5
@@ -2412,11 +2447,11 @@ export default function GestioneAssegnazioni() {
                 height: 36, // Aumentato da 32 a 36
               }}
             >
-              <Avatar 
-                src="/images/citta.png" 
+              <Avatar
+                src="/images/citta.png"
                 alt="Città"
                 variant="rounded"
-                sx={{ 
+                sx={{
                   width: 28, // Aumentato da 24 a 28
                   height: 28, // Aumentato da 24 a 28
                   bgcolor: "transparent",
@@ -2427,7 +2462,9 @@ export default function GestioneAssegnazioni() {
                 }}
               />
               <Box sx={{ flexGrow: 1, display: "flex", alignItems: "center" }}>
-                <Typography variant="caption" sx={{ fontWeight: 500 }}> {/* Cambiato da subtitle2 a caption */}
+                <Typography variant="caption" sx={{ fontWeight: 500 }}>
+                  {" "}
+                  {/* Cambiato da subtitle2 a caption */}
                   Città
                 </Typography>
                 <Typography
@@ -2436,12 +2473,14 @@ export default function GestioneAssegnazioni() {
                   sx={{ ml: "auto" }}
                 >
                   {incarichiCittaFiltrati.length}{" "}
-                  {incarichiCittaFiltrati.length === 1 ? "incarico" : "incarichi"}
+                  {incarichiCittaFiltrati.length === 1
+                    ? "incarico"
+                    : "incarichi"}
                 </Typography>
               </Box>
-              <IconButton 
+              <IconButton
                 size="small"
-                sx={{ 
+                sx={{
                   transform: cittaExpanded ? "rotate(180deg)" : "none",
                   transition: "transform 0.2s",
                   width: 20, // Ridotto
@@ -2449,15 +2488,16 @@ export default function GestioneAssegnazioni() {
                   p: 0, // Rimuove il padding
                 }}
               >
-                <ExpandMoreIcon sx={{ fontSize: 16 }} /> {/* Ridotto ulteriormente */}
+                <ExpandMoreIcon sx={{ fontSize: 16 }} />{" "}
+                {/* Ridotto ulteriormente */}
               </IconButton>
             </Box>
           </Box>
 
           {/* Lista degli incarichi città */}
-          <Paper 
+          <Paper
             elevation={0}
-            sx={{ 
+            sx={{
               mb: 0, // Cambiato da 1 a 0 per rimuovere lo spazio
               border: 1,
               borderColor: "divider",
@@ -2466,410 +2506,271 @@ export default function GestioneAssegnazioni() {
             }}
           >
             <Collapse in={cittaExpanded}>
-              {incarichiCittaFiltrati.map((incarico) => {
-                const conteggi = getConteggiCitta(incarico);
-                
-                return (
-                  <Box
-                    key={incarico.id}
-                    sx={{
-                      borderBottom: "1px solid",
-                      borderColor: "divider",
-                      "&:last-child": {
-                        borderBottom: 0,
-                      },
-                    }}
-                  >
-                    <Box 
-                      sx={{ 
-                        display: "flex",
-                        alignItems: "center",
-                        p: 0.25, // Ridotto da 0.5 a 0.25
+              {incarichiCittaFiltrati
+                .sort((a, b) => {
+                  if (a.tipo === "edificio" && b.tipo === "visitatore")
+                    return 1;
+                  if (a.tipo === "visitatore" && b.tipo === "edificio")
+                    return -1;
+                  return a.nome.localeCompare(b.nome);
+                })
+                .map((incarico) => {
+                  const conteggi = getConteggiCitta(incarico);
+                  return (
+                    <Box
+                      key={incarico.id}
+                      sx={{
+                        borderBottom: "1px solid",
+                        borderColor: "divider",
+                        "&:last-child": {
+                          borderBottom: 0,
+                        },
                       }}
-                      role="row"
                     >
-                      {/* Contatori */}
                       <Box
                         sx={{
                           display: "flex",
-                          flexDirection: "column",
-                          gap: 0.5, // Ridotto da 0.5 a 0
-                          mr: 1, // Ridotto da 2 a 1
-                        }}
-                      >
-                        <Tooltip title="Farm attive/completate">
-                          <Chip
-                            label={`${conteggi.attive}/${conteggi.completateAttive}`}
-                            size="small"
-                            sx={{ 
-                              height: 14, // Ridotto da 16 a 14
-                              minWidth: "auto",
-                              bgcolor: conteggi.attive === 0 ? "rgb(0, 0, 0, 0.03)" : "rgb(33, 150, 243, 0.1)",
-                              color: conteggi.attive === 0 ? "rgb(0, 0, 0, 0.6)" : "rgb(33, 150, 243)",
-                              "& .MuiChip-label": {
-                                px: 0.5,
-                                fontSize: "0.6rem", // Ridotto da 0.65rem a 0.6rem
-                                lineHeight: 1,
-                                fontWeight: 400
-                              }
-                            }}
-                            onClick={() => {
-                              if (conteggi.attive > 0) {
-                                handleToggleGiocatori(incarico.id, "attivi");
-                              } else if (conteggi.completateAttive > 0) {
-                                handleToggleGiocatori(
-                                  incarico.id,
-                                  "completati_attivi"
-                                );
-                              }
-                            }}
-                          />
-                        </Tooltip>
-                        <Tooltip title="Farm inattive/completate">
-                          <Chip
-                            label={`${conteggi.inattive}/${conteggi.completateInattive}`}
-                            size="small"
-                            sx={{ 
-                              height: 14, // Ridotto da 16 a 14
-                              minWidth: "auto",
-                              bgcolor: "rgb(0, 0, 0, 0.03)",
-                              color: "rgb(0, 0, 0, 0.6)",
-                              "& .MuiChip-label": {
-                                px: 0.5,
-                                fontSize: "0.6rem", // Ridotto da 0.65rem a 0.6rem
-                                lineHeight: 1,
-                                fontWeight: 400
-                              }
-                            }}
-                            onClick={() => {
-                              if (conteggi.inattive > 0) {
-                                handleToggleGiocatori(incarico.id, "inattivi");
-                              } else if (conteggi.completateInattive > 0) {
-                                handleToggleGiocatori(
-                                  incarico.id,
-                                  "completati_inattivi"
-                                );
-                              }
-                            }}
-                          />
-                        </Tooltip>
-                      </Box>
-
-                      {/* Strisciolina del livello */}
-                      <Box
-                        sx={{
-                          width: "18px", // Ridotto da 24px a 18px
-                          bgcolor: "rgb(33, 150, 243, 0.1)",
-                          display: "flex",
                           alignItems: "center",
-                          justifyContent: "center",
-                          alignSelf: "stretch",
+                          p: 0.25, // Ridotto da 0.5 a 0.25
                         }}
+                        role="row"
                       >
-                        <Typography 
-                          sx={{ 
-                            fontSize: "0.6rem", // Ridotto da 0.75rem a 0.6rem
-                            fontStyle: "italic",
-                            color: "rgb(33, 150, 243)",
-                            width: "2ch", // Ridotto da 3ch a 2ch
-                            textAlign: "center",
-                          }}
-                        >
-                          {incarico.livello_minimo}
-                        </Typography>
-                      </Box>
-
-                      {/* Icona e nome - area cliccabile */}
-                      <Box 
-                        sx={{ 
-                          display: "flex",
-                          alignItems: "center",
-                          flexGrow: 1,
-                          borderRadius: 1,
-                          p: 0.25, // Ridotto da 1 a 0.25
-                        }}
-                        id={`citta_${incarico.id}`}
-                      >
-                        <Avatar
-                          src={incarico.immagine}
-                          variant="rounded"
-                          sx={{ 
-                            width: 24, // Ridotto da 32 a 24
-                            height: 24, // Ridotto da 32 a 24
-                            mr: 0.5, // Ridotto da 1 a 0.5
-                          }}
-                        >
-                          {incarico.nome.charAt(0)}
-                        </Avatar>
-                        <Typography
-                          variant="body2"
-                          sx={{ 
-                            border: 1,
-                            borderColor: "divider",
-                            borderRadius: 1,
-                            px: 0.25, // Ridotto da 0.5 a 0.25
-                            py: 0, // Ridotto da 0.25 a 0
-                            fontSize: "0.65rem", // Ridotto da 0.75rem a 0.65rem
-                            minWidth: "24px", // Ridotto da 32px a 24px
-                            textAlign: "center",
-                            mr: 1, // Ridotto da 2 a 1
-                          }}
-                        >
-                          x{getQuantitaIncaricoCitta(incarico)}
-                        </Typography>
-                        <Box sx={{ flexGrow: 1 }}>
-                          <Typography variant="body2" sx={{ fontSize: "0.75rem", lineHeight: 1.1 }}>
-                            {incarico.nome}
-                          </Typography>
-                          <Box sx={{ display: "flex", gap: 0.25, mt: 0.25 }}>
-                            {(() => {
-                              const cestoContenitore = trovaCestoPerIncarico(
-                                incarico.id
-                              );
-                              if (!cestoContenitore) return null;
-                              
-                              return (
-                                <Chip
-                                  label={cestoContenitore.nome}
-                                  size="small"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    scrollToCesto(cestoContenitore.id);
-                                  }}
-                                  sx={{ 
-                                    height: 20,
-                                    width: "fit-content",
-                                    display: "inline-flex",
-                                    bgcolor: "#d4a76a",
-                                    color: "white",
-                                    cursor: "pointer",
-                                    "& .MuiChip-label": {
-                                      px: 0.5,
-                                      fontSize: "0.75rem",
-                                      display: "block",
-                                      whiteSpace: "nowrap",
-                                    },
-                                    "&:hover": {
-                                      bgcolor: "#c39355",
-                                    },
-                                  }}
-                                />
-                              );
-                            })()}
-                          </Box>
-                        </Box>
-                        <IconButton
-                          size="small"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setAnchorEl({
-                              id: `citta_${incarico.id}`,
-                              element: event.currentTarget,
-                            });
-                          }}
-                          sx={{ 
-                            ml: "auto",
-                            width: 20, // Ridotto da 28 a 20
-                            height: 20, // Ridotto da 28 a 20
-                            color: "text.secondary",
-                          }}
-                        >
-                          <MoreVertIcon sx={{ fontSize: 16 }} /> {/* Ridotto da 20 a 16 */}
-                        </IconButton>
-                      </Box>
-                    </Box>
-
-                    {/* Area espandibile per i giocatori assegnati */}
-                    <Collapse
-                      in={[
-                        "attivi",
-                        "inattivi",
-                        "completati_attivi",
-                        "completati_inattivi",
-                      ].some((tipo) =>
-                        expandedIncarichi.includes(`${incarico.id}_${tipo}`)
-                      )}
-                    >
-                      <Box sx={{ pl: 3, pr: 1, py: 0.5 }}> {/* Ridotto padding */}
+                        {/* Contatori */}
                         <Box
                           sx={{
                             display: "flex",
                             flexDirection: "column",
-                            gap: 2,
+                            gap: 0.5, // Ridotto da 0.5 a 0
+                            mr: 1, // Ridotto da 2 a 1
                           }}
                         >
-                          {/* Sezione Assegnati */}
-                          <Box>
-                            <Typography
-                              variant="caption"
+                          <Tooltip title="Farm attive/completate">
+                            <Chip
+                              label={`${conteggi.attive}/${conteggi.completateAttive}`}
+                              size="small"
                               sx={{
-                                color: "text.primary",
-                                fontWeight: 700,
-                                display: "block",
-                                mb: 1,
+                                height: 14, // Ridotto da 16 a 14
+                                minWidth: "auto",
+                                bgcolor:
+                                  conteggi.attive === 0
+                                    ? "rgb(0, 0, 0, 0.03)"
+                                    : "rgb(33, 150, 243, 0.1)",
+                                color:
+                                  conteggi.attive === 0
+                                    ? "rgb(0, 0, 0, 0.6)"
+                                    : "rgb(33, 150, 243)",
+                                "& .MuiChip-label": {
+                                  px: 0.5,
+                                  fontSize: "0.6rem", // Ridotto da 0.65rem a 0.6rem
+                                  lineHeight: 1,
+                                  fontWeight: 400,
+                                },
                               }}
+                              onClick={() => {
+                                if (conteggi.attive > 0) {
+                                  handleToggleGiocatori(incarico.id, "attivi");
+                                } else if (conteggi.completateAttive > 0) {
+                                  handleToggleGiocatori(
+                                    incarico.id,
+                                    "completati_attivi"
+                                  );
+                                }
+                              }}
+                            />
+                          </Tooltip>
+                          <Tooltip title="Farm inattive/completate">
+                            <Chip
+                              label={`${conteggi.inattive}/${conteggi.completateInattive}`}
+                              size="small"
+                              sx={{
+                                height: 14, // Ridotto da 16 a 14
+                                minWidth: "auto",
+                                bgcolor: "rgb(0, 0, 0, 0.03)",
+                                color: "rgb(0, 0, 0, 0.6)",
+                                "& .MuiChip-label": {
+                                  px: 0.5,
+                                  fontSize: "0.6rem", // Ridotto da 0.65rem a 0.6rem
+                                  lineHeight: 1,
+                                  fontWeight: 400,
+                                },
+                              }}
+                              onClick={() => {
+                                if (conteggi.inattive > 0) {
+                                  handleToggleGiocatori(
+                                    incarico.id,
+                                    "inattivi"
+                                  );
+                                } else if (conteggi.completateInattive > 0) {
+                                  handleToggleGiocatori(
+                                    incarico.id,
+                                    "completati_inattivi"
+                                  );
+                                }
+                              }}
+                            />
+                          </Tooltip>
+                        </Box>
+
+                        {/* Strisciolina del livello */}
+                        <Box
+                          sx={{
+                            width: "18px", // Ridotto da 24px a 18px
+                            bgcolor: "rgb(33, 150, 243, 0.1)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            alignSelf: "stretch",
+                          }}
+                        >
+                          <Typography
+                            sx={{
+                              fontSize: "0.6rem", // Mantenuto a 0.6rem
+                              fontStyle: "italic",
+                              color: "rgb(33, 150, 243)",
+                              width: "100%", // Cambiato da 2ch a 100% per adattarsi meglio
+                              textAlign: "center", // Mantenuto centrato
+                              lineHeight: 1, // Aggiunto per migliorare l'allineamento verticale
+                              padding: "0 1px", // Aggiunto padding orizzontale minimo
+                            }}
+                          >
+                            {incarico.livello_minimo}
+                          </Typography>
+                        </Box>
+
+                        {/* Icona e nome - area cliccabile */}
+                        <Box
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            flexGrow: 1,
+                            borderRadius: 1,
+                            p: 0.25, // Ridotto da 1 a 0.25
+                          }}
+                          id={`citta_${incarico.id}`}
+                        >
+                          <Avatar
+                            src={incarico.immagine}
+                            variant="rounded"
+                            sx={{
+                              width: 24, // Ridotto da 32 a 24
+                              height: 24, // Ridotto da 32 a 24
+                              mr: 0.5, // Ridotto da 1 a 0.5
+                            }}
+                          >
+                            {incarico.nome.charAt(0)}
+                          </Avatar>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              border: 1,
+                              borderColor: "divider",
+                              borderRadius: 1,
+                              px: 0.25, // Ridotto da 0.5 a 0.25
+                              py: 0, // Ridotto da 0.25 a 0
+                              fontSize: "0.65rem", // Ridotto da 0.75rem a 0.65rem
+                              minWidth: "24px", // Ridotto da 32px a 24px
+                              textAlign: "center",
+                              mr: 1, // Ridotto da 2 a 1
+                            }}
+                          >
+                            x{getQuantitaIncaricoCitta(incarico)}
+                          </Typography>
+                          <Box sx={{ flexGrow: 1 }}>
+                            <Typography
+                              variant="body2"
+                              sx={{ fontSize: "0.75rem", lineHeight: 1.1 }}
                             >
-                              ASSEGNATI
+                              {incarico.nome}
                             </Typography>
-
-                            {/* Farm attive assegnate */}
-                            {assegnazioni
-                              .filter(
-                                (a) =>
-                                  a.tipo === "incarico" &&
-                                  a.riferimento_id === incarico.id
-                              )
-                              .map((ass) => {
-                                const farm = farms.find(
-                                  (f) => f.farmId === ass.farm_id
+                            <Box sx={{ display: "flex", gap: 0.25, mt: 0.25 }}>
+                              {(() => {
+                                const cestoContenitore = trovaCestoPerIncarico(
+                                  incarico.id
                                 );
-                                if (!farm || !farm.isAttiva) return null;
-                                
-                                const progresso = getProgressoIncarico(
-                                  incarico.id,
-                                  farm.id
-                                );
-                                const completamenti = getCompletamentiIncarico(
-                                  progresso,
-                                  incarico.quantita
-                                );
-                                const isCompletato = completamenti > 0;
+                                if (!cestoContenitore) return null;
 
                                 return (
-                                  <Box
-                                    key={farm.id}
-                                    sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 1,
+                                  <Chip
+                                    label={cestoContenitore.nome}
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      scrollToCesto(cestoContenitore.id);
                                     }}
-                                  >
-                                    <Box
-                                      sx={{
-                                        width: 20,
-                                        height: 20,
-                                        borderRadius: "50%",
-                                        ...(isCompletato
-                                          ? { bgcolor: "rgb(33, 150, 243)" }
-                                          : {
-                                              border:
-                                                "2px solid rgb(33, 150, 243)",
-                                            }),
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                      }}
-                                    />
-                                    <Typography sx={{ fontSize: "0.875rem" }}>
-                                      {`${farm.giocatore_nome} - ${farm.nome}`}
-                                    </Typography>
-                                    <IconButton
-                                      size="small"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        e.preventDefault();
-                                        handleRimuoviAssegnazione(
-                                          ass.id,
-                                          "incarico"
-                                        );
-                                      }}
-                                      sx={{ 
-                                        ml: "auto",
-                                        width: 20,
-                                        height: 20,
-                                        color: "text.secondary",
-                                      }}
-                                    >
-                                      <CloseIcon sx={{ fontSize: 16 }} />
-                                    </IconButton>
-                                  </Box>
-                                );
-                              })}
-
-                            {/* Farm inattive assegnate */}
-                            {assegnazioni
-                              .filter(
-                                (a) =>
-                                  a.tipo === "incarico" &&
-                                  a.riferimento_id === incarico.id
-                              )
-                              .map((ass) => {
-                                const farm = farms.find(
-                                  (f) => f.farmId === ass.farm_id
-                                );
-                                if (!farm || farm.isAttiva) return null;
-                                
-                                const progresso = getProgressoIncarico(
-                                  incarico.id,
-                                  farm.id
-                                );
-                                const completamenti = getCompletamentiIncarico(
-                                  progresso,
-                                  incarico.quantita
-                                );
-                                const isCompletato = completamenti > 0;
-
-                                return (
-                                  <Box
-                                    key={farm.id}
                                     sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 1,
+                                      height: 16,
+                                      width: "fit-content",
+                                      display: "inline-flex",
+                                      bgcolor: "#d4a76a",
+                                      color: "white",
+                                      cursor: "pointer",
+                                      "& .MuiChip-label": {
+                                        px: 0.5,
+                                        fontSize: "0.65rem",
+                                        display: "block",
+                                        whiteSpace: "nowrap",
+                                        lineHeight: 1,
+                                      },
+                                      "&:hover": {
+                                        bgcolor: "#c39355",
+                                      },
                                     }}
-                                  >
-                                    <Box
-                                      sx={{
-                                        width: 20,
-                                        height: 20,
-                                        borderRadius: "50%",
-                                        ...(isCompletato
-                                          ? { bgcolor: "rgba(0, 0, 0, 0.2)" }
-                                          : {
-                                              border:
-                                                "2px solid rgba(0, 0, 0, 0.2)",
-                                            }),
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                      }}
-                                    />
-                                    <Typography
-                                      sx={{
-                                        fontSize: "0.875rem",
-                                        color: "text.secondary",
-                                      }}
-                                    >
-                                      {`${farm.giocatore_nome} - ${farm.nome}`}
-                                    </Typography>
-                                    <IconButton
-                                      size="small"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        e.preventDefault();
-                                        handleRimuoviAssegnazione(
-                                          ass.id,
-                                          "incarico"
-                                        );
-                                      }}
-                                      sx={{ 
-                                        ml: "auto",
-                                        width: 20,
-                                        height: 20,
-                                        color: "text.secondary",
-                                      }}
-                                    >
-                                      <CloseIcon sx={{ fontSize: 16 }} />
-                                    </IconButton>
-                                  </Box>
+                                  />
                                 );
-                              })}
+                              })()}
+                            </Box>
                           </Box>
+                          <IconButton
+                            size="small"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setAnchorEl({
+                                id: `citta_${incarico.id}`,
+                                element: event.currentTarget,
+                              });
+                            }}
+                            sx={{
+                              ml: "auto",
+                              width: 20, // Ridotto da 28 a 20
+                              height: 20, // Ridotto da 28 a 20
+                              color: "text.secondary",
+                            }}
+                          >
+                            <MoreVertIcon sx={{ fontSize: 16 }} />{" "}
+                            {/* Ridotto da 20 a 16 */}
+                          </IconButton>
+                        </Box>
+                      </Box>
 
-                          {/* Sezione Completati non assegnati */}
-                          {(conteggi.completateSenzaAssegnazioneAttive > 0 ||
-                            conteggi.completateSenzaAssegnazioneInattive >
-                              0) && (
+                      {/* Area espandibile per i giocatori assegnati */}
+                      <Collapse
+                        in={[
+                          "attivi",
+                          "inattivi",
+                          "completati_attivi",
+                          "completati_inattivi",
+                        ].some((tipo) =>
+                          expandedIncarichi.includes(`${incarico.id}_${tipo}`)
+                        )}
+                      >
+                        <Box
+                          sx={{
+                            pl: 5,
+                            pr: 2,
+                            py: 1,
+                            position: "relative", // Aggiunto per creare un nuovo contesto di posizionamento
+                            zIndex: 1, // Assicura che sia sotto il pulsante del menu
+                            marginRight: "20px", // Aggiunto per lasciare spazio al pulsante del menu
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: 2,
+                            }}
+                          >
+                            {/* Sezione Assegnati */}
                             <Box>
                               <Typography
                                 variant="caption"
@@ -2880,236 +2781,413 @@ export default function GestioneAssegnazioni() {
                                   mb: 1,
                                 }}
                               >
-                                COMPLETATI (NON ASSEGNATI)
+                                ASSEGNATI
                               </Typography>
 
-                              {/* Farm attive con completamenti */}
-                              {conteggi.completateSenzaAssegnazioneAttive >
-                                0 && (
-                                <Box sx={{ mb: 2 }}>
-                                  <Typography
-                                    variant="caption"
-                                    sx={{
-                                      color: "rgb(33, 150, 243)",
-                                      fontWeight: 500,
-                                      display: "block",
-                                      mb: 0.5,
-                                    }}
-                                  >
-                                    ATTIVI
-                                  </Typography>
-                                  <Box
-                                    sx={{
-                                      display: "flex",
-                                      flexDirection: "column",
-                                      gap: 0.5,
-                                    }}
-                                  >
-                                    {farms
-                                      .filter((farm) => {
-                                        if (!farm.isAttiva) return false;
-                                        const progresso = getProgressoIncarico(
-                                          incarico.id,
-                                          farm.id
-                                        );
-                                        const completamenti =
-                                          getCompletamentiIncarico(
-                                            progresso,
-                                            incarico.quantita
-                                          );
-                                        const haAssegnazione =
-                                          assegnazioni.some(
-                                            (a) =>
-                                              a.tipo === "incarico" &&
-                                              a.riferimento_id ===
-                                                incarico.id &&
-                                              a.farm_id === farm.id
-                                        );
-                                        return (
-                                          completamenti > 0 && !haAssegnazione
-                                        );
-                                      })
-                                      .sort((a, b) => {
-                                        const nomeA = a.giocatore_nome || "";
-                                        const nomeB = b.giocatore_nome || "";
-                                        return nomeA.localeCompare(nomeB);
-                                      })
-                                      .map((farm) => (
-                                        <Box
-                                          key={farm.id}
-                                          sx={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: 1,
-                                          }}
-                                        >
-                                          <Box
-                                            sx={{
-                                              width: 20,
-                                              height: 20,
-                                              borderRadius: "50%",
-                                              bgcolor: "#ffc107",
-                                              display: "flex",
-                                              alignItems: "center",
-                                              justifyContent: "center",
-                                            }}
-                                          />
-                                          <Typography
-                                            sx={{ fontSize: "0.875rem" }}
-                                          >
-                                            {`${farm.giocatore_nome} - ${farm.nome}`}
-                                          </Typography>
-                                          <IconButton
-                                            size="small"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              e.preventDefault();
-                                              handleAssegnaIncarico(
-                                                incarico.id,
-                                                farm.id
-                                              );
-                                            }}
-                                            sx={{ 
-                                              ml: "auto",
-                                              width: 20,
-                                              height: 20,
-                                              color: "primary.main",
-                                            }}
-                                          >
-                                            <AddIcon sx={{ fontSize: 16 }} />
-                                          </IconButton>
-                                        </Box>
-                                      ))}
-                                  </Box>
-                                </Box>
-                              )}
+                              {/* Farm attive assegnate */}
+                              {assegnazioni
+                                .filter(
+                                  (a) =>
+                                    a.tipo === "incarico" &&
+                                    a.riferimento_id === incarico.id
+                                )
+                                .map((ass) => {
+                                  const farm = farms.find(
+                                    (f) => f.farmId === ass.farm_id
+                                  );
+                                  if (!farm || !farm.isAttiva) return null;
 
-                              {/* Farm inattive con completamenti */}
-                              {conteggi.completateSenzaAssegnazioneInattive >
-                                0 && (
-                                <Box>
-                                  <Typography
-                                    variant="caption"
-                                    sx={{
-                                      color: "text.secondary",
-                                      fontWeight: 500,
-                                      display: "block",
-                                      mb: 0.5,
-                                    }}
-                                  >
-                                    INATTIVI
-                                  </Typography>
-                                  <Box
-                                    sx={{
-                                      display: "flex",
-                                      flexDirection: "column",
-                                      gap: 0.5,
-                                    }}
-                                  >
-                                    {farms
-                                      .filter((farm) => {
-                                        if (farm.isAttiva) return false;
-                                        const progresso = getProgressoIncarico(
-                                          incarico.id,
-                                          farm.id
-                                        );
-                                        const completamenti =
-                                          getCompletamentiIncarico(
-                                            progresso,
-                                            incarico.quantita
+                                  const progresso = getProgressoIncarico(
+                                    incarico.id,
+                                    farm.id
+                                  );
+                                  const completamenti =
+                                    getCompletamentiIncarico(
+                                      progresso,
+                                      incarico.quantita
+                                    );
+                                  const isCompletato = completamenti > 0;
+
+                                  return (
+                                    <Box
+                                      key={farm.id}
+                                      sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 1,
+                                      }}
+                                    >
+                                      <Box
+                                        sx={{
+                                          width: 20,
+                                          height: 20,
+                                          borderRadius: "50%",
+                                          ...(isCompletato
+                                            ? { bgcolor: "rgb(33, 150, 243)" }
+                                            : {
+                                                border:
+                                                  "2px solid rgb(33, 150, 243)",
+                                              }),
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                        }}
+                                      />
+                                      <Typography sx={{ fontSize: "0.875rem" }}>
+                                        {`${farm.giocatore_nome} - ${farm.nome}`}
+                                      </Typography>
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          e.preventDefault();
+                                          handleRimuoviAssegnazione(
+                                            ass.id,
+                                            "incarico"
                                           );
-                                        const haAssegnazione =
-                                          assegnazioni.some(
-                                            (a) =>
-                                              a.tipo === "incarico" &&
-                                              a.riferimento_id ===
-                                                incarico.id &&
-                                              a.farm_id === farm.id
-                                        );
-                                        return (
-                                          completamenti > 0 && !haAssegnazione
-                                        );
-                                      })
-                                      .sort((a, b) => {
-                                        const nomeA = a.giocatore_nome || "";
-                                        const nomeB = b.giocatore_nome || "";
-                                        return nomeA.localeCompare(nomeB);
-                                      })
-                                      .map((farm) => (
-                                        <Box
-                                          key={farm.id}
-                                          sx={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: 1,
-                                          }}
-                                        >
+                                        }}
+                                        sx={{
+                                          ml: "auto",
+                                          width: 20,
+                                          height: 20,
+                                          color: "text.secondary",
+                                        }}
+                                      >
+                                        <CloseIcon sx={{ fontSize: 16 }} />
+                                      </IconButton>
+                                    </Box>
+                                  );
+                                })}
+
+                              {/* Farm inattive assegnate */}
+                              {assegnazioni
+                                .filter(
+                                  (a) =>
+                                    a.tipo === "incarico" &&
+                                    a.riferimento_id === incarico.id
+                                )
+                                .map((ass) => {
+                                  const farm = farms.find(
+                                    (f) => f.farmId === ass.farm_id
+                                  );
+                                  if (!farm || farm.isAttiva) return null;
+
+                                  const progresso = getProgressoIncarico(
+                                    incarico.id,
+                                    farm.id
+                                  );
+                                  const completamenti =
+                                    getCompletamentiIncarico(
+                                      progresso,
+                                      incarico.quantita
+                                    );
+                                  const isCompletato = completamenti > 0;
+
+                                  return (
+                                    <Box
+                                      key={farm.id}
+                                      sx={{
+                                        display: "flex",
+                                        alignItems: "center",
+                                        gap: 1,
+                                      }}
+                                    >
+                                      <Box
+                                        sx={{
+                                          width: 20,
+                                          height: 20,
+                                          borderRadius: "50%",
+                                          ...(isCompletato
+                                            ? { bgcolor: "rgba(0, 0, 0, 0.2)" }
+                                            : {
+                                                border:
+                                                  "2px solid rgba(0, 0, 0, 0.2)",
+                                              }),
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                        }}
+                                      />
+                                      <Typography
+                                        sx={{
+                                          fontSize: "0.875rem",
+                                          color: "text.secondary",
+                                        }}
+                                      >
+                                        {`${farm.giocatore_nome} - ${farm.nome}`}
+                                      </Typography>
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          e.preventDefault();
+                                          handleRimuoviAssegnazione(
+                                            ass.id,
+                                            "incarico"
+                                          );
+                                        }}
+                                        sx={{
+                                          ml: "auto",
+                                          width: 20,
+                                          height: 20,
+                                          color: "text.secondary",
+                                        }}
+                                      >
+                                        <CloseIcon sx={{ fontSize: 16 }} />
+                                      </IconButton>
+                                    </Box>
+                                  );
+                                })}
+                            </Box>
+
+                            {/* Sezione Completati non assegnati */}
+                            {(conteggi.completateSenzaAssegnazioneAttive > 0 ||
+                              conteggi.completateSenzaAssegnazioneInattive >
+                                0) && (
+                              <Box>
+                                <Typography
+                                  variant="caption"
+                                  sx={{
+                                    color: "text.primary",
+                                    fontWeight: 700,
+                                    display: "block",
+                                    mb: 1,
+                                  }}
+                                >
+                                  COMPLETATI (NON ASSEGNATI)
+                                </Typography>
+
+                                {/* Farm attive con completamenti */}
+                                {conteggi.completateSenzaAssegnazioneAttive >
+                                  0 && (
+                                  <Box sx={{ mb: 2 }}>
+                                    <Typography
+                                      variant="caption"
+                                      sx={{
+                                        color: "rgb(33, 150, 243)",
+                                        fontWeight: 500,
+                                        display: "block",
+                                        mb: 0.5,
+                                      }}
+                                    >
+                                      ATTIVI
+                                    </Typography>
+                                    <Box
+                                      sx={{
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: 0.5,
+                                      }}
+                                    >
+                                      {farms
+                                        .filter((farm) => {
+                                          if (!farm.isAttiva) return false;
+                                          const progresso =
+                                            getProgressoIncarico(
+                                              incarico.id,
+                                              farm.id
+                                            );
+                                          const completamenti =
+                                            getCompletamentiIncarico(
+                                              progresso,
+                                              incarico.quantita
+                                            );
+                                          const haAssegnazione =
+                                            assegnazioni.some(
+                                              (a) =>
+                                                a.tipo === "incarico" &&
+                                                a.riferimento_id ===
+                                                  incarico.id &&
+                                                a.farm_id === farm.id
+                                            );
+                                          return (
+                                            completamenti > 0 && !haAssegnazione
+                                          );
+                                        })
+                                        .sort((a, b) => {
+                                          const nomeA = a.giocatore_nome || "";
+                                          const nomeB = b.giocatore_nome || "";
+                                          return nomeA.localeCompare(nomeB);
+                                        })
+                                        .map((farm) => (
                                           <Box
+                                            key={farm.id}
                                             sx={{
-                                              width: 20,
-                                              height: 20,
-                                              borderRadius: "50%",
-                                              bgcolor: "#8d6e63",
                                               display: "flex",
                                               alignItems: "center",
-                                              justifyContent: "center",
-                                            }}
-                                          />
-                                          <Typography
-                                            sx={{
-                                              fontSize: "0.875rem",
-                                              color: "text.secondary",
+                                              gap: 1,
                                             }}
                                           >
-                                            {`${farm.giocatore_nome} - ${farm.nome}`}
-                                          </Typography>
-                                          <IconButton
-                                            size="small"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              e.preventDefault();
-                                              handleAssegnaIncarico(
-                                                incarico.id,
-                                                farm.id
-                                              );
-                                            }}
-                                            sx={{ 
-                                              ml: "auto",
-                                              width: 20,
-                                              height: 20,
-                                              color: "primary.main",
-                                            }}
-                                          >
-                                            <AddIcon sx={{ fontSize: 16 }} />
-                                          </IconButton>
-                                        </Box>
-                                      ))}
+                                            <Box
+                                              sx={{
+                                                width: 20,
+                                                height: 20,
+                                                borderRadius: "50%",
+                                                bgcolor: "#ffc107",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                              }}
+                                            />
+                                            <Typography
+                                              sx={{ fontSize: "0.875rem" }}
+                                            >
+                                              {`${farm.giocatore_nome} - ${farm.nome}`}
+                                            </Typography>
+                                            <IconButton
+                                              size="small"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                e.preventDefault();
+                                                handleAssegnaIncarico(
+                                                  incarico.id,
+                                                  farm.id
+                                                );
+                                              }}
+                                              sx={{
+                                                ml: "auto",
+                                                width: 20,
+                                                height: 20,
+                                                color: "primary.main",
+                                              }}
+                                            >
+                                              <AddIcon sx={{ fontSize: 16 }} />
+                                            </IconButton>
+                                          </Box>
+                                        ))}
+                                    </Box>
                                   </Box>
-                                </Box>
-                              )}
-                            </Box>
-                          )}
+                                )}
+
+                                {/* Farm inattive con completamenti */}
+                                {conteggi.completateSenzaAssegnazioneInattive >
+                                  0 && (
+                                  <Box>
+                                    <Typography
+                                      variant="caption"
+                                      sx={{
+                                        color: "text.secondary",
+                                        fontWeight: 500,
+                                        display: "block",
+                                        mb: 0.5,
+                                      }}
+                                    >
+                                      INATTIVI
+                                    </Typography>
+                                    <Box
+                                      sx={{
+                                        display: "flex",
+                                        flexDirection: "column",
+                                        gap: 0.5,
+                                      }}
+                                    >
+                                      {farms
+                                        .filter((farm) => {
+                                          if (farm.isAttiva) return false;
+                                          const progresso =
+                                            getProgressoIncarico(
+                                              incarico.id,
+                                              farm.id
+                                            );
+                                          const completamenti =
+                                            getCompletamentiIncarico(
+                                              progresso,
+                                              incarico.quantita
+                                            );
+                                          const haAssegnazione =
+                                            assegnazioni.some(
+                                              (a) =>
+                                                a.tipo === "incarico" &&
+                                                a.riferimento_id ===
+                                                  incarico.id &&
+                                                a.farm_id === farm.id
+                                            );
+                                          return (
+                                            completamenti > 0 && !haAssegnazione
+                                          );
+                                        })
+                                        .sort((a, b) => {
+                                          const nomeA = a.giocatore_nome || "";
+                                          const nomeB = b.giocatore_nome || "";
+                                          return nomeA.localeCompare(nomeB);
+                                        })
+                                        .map((farm) => (
+                                          <Box
+                                            key={farm.id}
+                                            sx={{
+                                              display: "flex",
+                                              alignItems: "center",
+                                              gap: 1,
+                                            }}
+                                          >
+                                            <Box
+                                              sx={{
+                                                width: 20,
+                                                height: 20,
+                                                borderRadius: "50%",
+                                                bgcolor: "#8d6e63",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                              }}
+                                            />
+                                            <Typography
+                                              sx={{
+                                                fontSize: "0.875rem",
+                                                color: "text.secondary",
+                                              }}
+                                            >
+                                              {`${farm.giocatore_nome} - ${farm.nome}`}
+                                            </Typography>
+                                            <IconButton
+                                              size="small"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                e.preventDefault();
+                                                handleAssegnaIncarico(
+                                                  incarico.id,
+                                                  farm.id
+                                                );
+                                              }}
+                                              sx={{
+                                                ml: "auto",
+                                                width: 20,
+                                                height: 20,
+                                                color: "primary.main",
+                                              }}
+                                            >
+                                              <AddIcon sx={{ fontSize: 16 }} />
+                                            </IconButton>
+                                          </Box>
+                                        ))}
+                                    </Box>
+                                  </Box>
+                                )}
+                              </Box>
+                            )}
+                          </Box>
                         </Box>
-                      </Box>
-                    </Collapse>
-                  </Box>
-                );
-              })}
+                      </Collapse>
+                    </Box>
+                  );
+                })}
             </Collapse>
           </Paper>
         </Box>
 
         {/* Barra di visualizzazione */}
-        <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center',
-          gap: 1,
-          px: 2,
-          py: 1,
-          borderBottom: '1px solid',
-          borderColor: 'divider',
-          bgcolor: 'rgba(0, 0, 0, 0.02)'
-        }}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+            px: 2,
+            py: 1,
+            borderBottom: "1px solid",
+            borderColor: "divider",
+            bgcolor: "rgba(0, 0, 0, 0.02)",
+          }}
+        >
           <Typography variant="body2" color="text.secondary">
             Vista:
           </Typography>
@@ -3121,9 +3199,10 @@ export default function GestioneAssegnazioni() {
             }
           >
             <IconButton
-              onClick={() => setVisualizzazioneGlobale(!visualizzazioneGlobale)}
+              onClick={handleToggleVisualizzazione}
               color={visualizzazioneGlobale ? "primary" : "default"}
               size="small"
+              disabled={inTransizione}
             >
               <ViewListIcon />
             </IconButton>
@@ -3211,7 +3290,9 @@ export default function GestioneAssegnazioni() {
                   setOrdinamentoContatori(false);
                   setOrdinamentoLivelloInverso(false);
                 } else {
-                  setOrdinamentoAlfabeticoInverso(!ordinamentoAlfabeticoInverso);
+                  setOrdinamentoAlfabeticoInverso(
+                    !ordinamentoAlfabeticoInverso
+                  );
                 }
               }}
               color={ordinamentoAlfabetico ? "primary" : "default"}
@@ -3258,808 +3339,869 @@ export default function GestioneAssegnazioni() {
           }}
         >
           {/* Rimuovo l'header degli incarichi che conteneva il pulsante */}
-          {gruppiIncarichi.map((gruppo) => {
-            const edificio = edifici.find((e) => e.id === gruppo.edificio_id);
-            const numIncarichi = gruppo.incarichi.length;
-            
-            return (
-              <Paper 
-                key={gruppo.edificio_id}
-                elevation={0}
-                sx={{ 
-                  mb: 0, // Cambiato da 1 a 0 per rimuovere lo spazio tra gli edifici
-                  border: 0, // Rimosso il bordo completo
-                  borderBottom: 1, // Aggiunto solo il bordo inferiore
-                  borderColor: "divider",
-                  borderRadius: 0, // Rimossi gli angoli smussati
-                  overflow: "hidden",
-                }}
-              >
-                {/* Header edificio con immagine */}
-                <Box
-                  onClick={() => handleEdificioToggle(gruppo.edificio_id)}
-                  sx={{ 
-                    display: "flex",
-                    alignItems: "center",
-                    p: 0.5, // Ridotto da 1 a 0.5
-                    cursor: "pointer",
-                    bgcolor:
-                      gruppo.edificio_id &&
-                      expandedEdifici.includes(gruppo.edificio_id)
-                        ? "action.selected"
-                        : "rgba(0, 0, 0, 0.02)", // Cambiato da "background.paper" a "rgba(0, 0, 0, 0.02)"
-                    "&:hover": {
-                      bgcolor: "action.hover",
-                    },
-                    minHeight: 48, // Aggiunto per fissare l'altezza minima
+          {!inTransizione &&
+            gruppiIncarichi.map((gruppo) => {
+              const edificio = edifici.find((e) => e.id === gruppo.edificio_id);
+              const numIncarichi = gruppo.incarichi.length;
+
+              return (
+                <Paper
+                  key={gruppo.edificio_id}
+                  elevation={0}
+                  sx={{
+                    mb: 0, // Cambiato da 1 a 0 per rimuovere lo spazio tra gli edifici
+                    border: 0, // Rimosso il bordo completo
+                    borderBottom: 1, // Aggiunto solo il bordo inferiore
+                    borderColor: "divider",
+                    borderRadius: 0, // Rimossi gli angoli smussati
+                    overflow: "hidden",
                   }}
                 >
-                  {/* Immagine edificio */}
-                  <Avatar
-                    src={
-                      visualizzazioneGlobale
-                        ? "/images/incarichiglobali.png"
-                        : edificio?.immagine
-                    }
-                    variant="rounded"
-                    sx={{ 
-                      width: 36, // Ridotto da 48 a 36
-                      height: 36, // Ridotto da 48 a 36
-                      mr: 1.5, // Ridotto da 2 a 1.5
-                      bgcolor: visualizzazioneGlobale
-                        ? "transparent"
-                        : undefined,
-                    }}
-                  >
-                    {!visualizzazioneGlobale && (edificio?.nome?.[0] || "?")}
-                  </Avatar>
-
-                  {/* Informazioni edificio */}
-                  <Box sx={{ flexGrow: 1 }}>
-                    <Box sx={{ display: "flex", alignItems: "center", mb: 0 }}>
-                      <Typography
-                        variant="body1"
-                        sx={{ 
-                          fontWeight: 500, 
-                          fontSize: '0.95rem',
-                          lineHeight: 1.2
-                        }}
-                      >
-                        {visualizzazioneGlobale
-                          ? "Tutti gli incarichi"
-                          : edificio?.nome || "Senza edificio"}
-                      </Typography>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ ml: "auto" }}
-                      >
-                        {numIncarichi}{" "}
-                        {numIncarichi === 1 ? "incarico" : "incarichi"}
-                      </Typography>
-                    </Box>
-                    {!visualizzazioneGlobale && (
-                      <Typography 
-                        variant="caption" 
-                        sx={{ 
-                          color: "rgb(33, 150, 243)",
-                          fontStyle: "italic",
-                          fontSize: "0.75rem"
-                        }}
-                      >
-                        {edificio?.livello || 0} {/* Rimosso il testo "Liv." */}
-                      </Typography>
-                    )}
-                  </Box>
-
-                  {/* Icona espansione */}
-                  <IconButton 
-                    size="small"
-                    sx={{ 
-                      transform:
+                  {/* Header edificio con immagine */}
+                  <Box
+                    onClick={() => handleEdificioToggle(gruppo.edificio_id)}
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      p: 0.5, // Ridotto da 1 a 0.5
+                      cursor: "pointer",
+                      bgcolor:
                         gruppo.edificio_id &&
                         expandedEdifici.includes(gruppo.edificio_id)
-                          ? "rotate(180deg)"
-                          : "none",
-                      transition: "transform 0.2s",
-                      width: 28,
-                      height: 28,
+                          ? "action.selected"
+                          : "rgba(0, 0, 0, 0.02)", // Cambiato da "background.paper" a "rgba(0, 0, 0, 0.02)"
+                      "&:hover": {
+                        bgcolor: "action.hover",
+                      },
+                      minHeight: 48, // Aggiunto per fissare l'altezza minima
                     }}
                   >
-                    <ExpandMoreIcon fontSize="small" />
-                  </IconButton>
-                </Box>
-
-                {/* Contenuto edificio */}
-                <Collapse
-                  in={
-                    gruppo.edificio_id
-                      ? expandedEdifici.includes(gruppo.edificio_id)
-                      : false
-                  }
-                >
-                  {gruppo.incarichi.map(
-                    ({ incarico, conteggi, giocatori_assegnati }) => (
-                    <Box
-                      id={`incarico-${incarico.id}`}
-                      key={incarico.id}
+                    {/* Immagine edificio */}
+                    <Avatar
+                      src={
+                        visualizzazioneGlobale
+                          ? "/images/incarichiglobali.png"
+                          : edificio?.immagine
+                      }
+                      variant="rounded"
                       sx={{
-                        position: "relative",
-                        borderBottom: "1px solid",
-                        borderColor: "divider",
-                        "&:last-child": {
-                          borderBottom: 0,
-                        },
-                        transition: "background-color 0.5s ease"
+                        width: 36, // Ridotto da 48 a 36
+                        height: 36, // Ridotto da 48 a 36
+                        mr: 1.5, // Ridotto da 2 a 1.5
+                        bgcolor: visualizzazioneGlobale
+                          ? "transparent"
+                          : undefined,
                       }}
                     >
-                      {/* Riga principale dell'incarico */}
+                      {!visualizzazioneGlobale && (edificio?.nome?.[0] || "?")}
+                    </Avatar>
+
+                    {/* Informazioni edificio */}
+                    <Box sx={{ flexGrow: 1 }}>
                       <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          width: "100%",
-                          pr: 6 // Spazio per il menu
-                        }}
+                        sx={{ display: "flex", alignItems: "center", mb: 0 }}
                       >
-                          {/* Contatori cliccabili */}
-                        <Box
+                        <Typography
+                          variant="body1"
                           sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: 0.5,
-                            p: 1
+                            fontWeight: 500,
+                            fontSize: "0.95rem",
+                            lineHeight: 1.2,
                           }}
                         >
-                            <Tooltip title="Farm attive/completate">
-                              <Chip
-                                label={`${conteggi.totaleAttive}/${conteggi.completateAttive}`}
-                                size="small"
-                                sx={{ 
-                                  height: 16,
-                                  minWidth: "auto",
-                                  bgcolor: conteggi.totaleAttive === 0 ? "rgb(0, 0, 0, 0.03)" : "rgb(33, 150, 243, 0.1)",
-                                  color: conteggi.totaleAttive === 0 ? "rgb(0, 0, 0, 0.6)" : "rgb(33, 150, 243)",
-                                  "& .MuiChip-label": {
-                                    px: 1,
-                                    fontSize: "0.65rem",
-                                    lineHeight: 1,
-                                    fontWeight: 400
-                                  }
-                                }}
-                                onClick={() => {
-                                  if (conteggi.totaleAttive > 0) {
-                                    handleToggleGiocatori(incarico.id, "attivi");
-                                  } else if (conteggi.completateAttive > 0) {
-                                    handleToggleGiocatori(incarico.id, "completati_attivi");
-                                  }
-                                }}
-                              />
-                            </Tooltip>
+                          {visualizzazioneGlobale
+                            ? "Tutti gli incarichi"
+                            : edificio?.nome || "Senza edificio"}
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          sx={{ ml: "auto" }}
+                        >
+                          {numIncarichi}{" "}
+                          {numIncarichi === 1 ? "incarico" : "incarichi"}
+                        </Typography>
+                      </Box>
+                      {!visualizzazioneGlobale && (
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            color: "rgb(33, 150, 243)",
+                            fontStyle: "italic",
+                            fontSize: "0.75rem",
+                          }}
+                        >
+                          {edificio?.livello || 0}{" "}
+                          {/* Rimosso il testo "Liv." */}
+                        </Typography>
+                      )}
+                    </Box>
 
-                            <Tooltip title="Farm inattive/completate">
-                              <Chip
-                                label={`${conteggi.totaleInattive}/${conteggi.completateInattive}`}
-                                size="small"
-                                sx={{ 
-                                  height: 16,  // Riduco l'altezza da 20 a 16
-                                  minWidth: "auto",
-                                  bgcolor: "rgb(0, 0, 0, 0.03)",
-                                  color: "rgb(0, 0, 0, 0.6)",
-                                  "& .MuiChip-label": {
-                                    px: 1,
-                                    fontSize: "0.65rem",
-                                  },
-                                }}
-                                onClick={() => {
-                                  if (conteggi.totaleInattive > 0) {
-                                    handleToggleGiocatori(incarico.id, "inattivi");
-                                  } else if (conteggi.completateInattive > 0) {
-                                    handleToggleGiocatori(incarico.id, "completati_inattivi");
-                                  }
-                                }}
-                              />
-                            </Tooltip>
-                          </Box>
+                    {/* Icona espansione */}
+                    <IconButton
+                      size="small"
+                      sx={{
+                        transform:
+                          gruppo.edificio_id &&
+                          expandedEdifici.includes(gruppo.edificio_id)
+                            ? "rotate(180deg)"
+                            : "none",
+                        transition: "transform 0.2s",
+                        width: 28,
+                        height: 28,
+                      }}
+                    >
+                      <ExpandMoreIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
 
-                          {/* Strisciolina del livello */}
+                  {/* Contenuto edificio */}
+                  <Collapse
+                    in={
+                      gruppo.edificio_id
+                        ? expandedEdifici.includes(gruppo.edificio_id)
+                        : false
+                    }
+                  >
+                    {gruppo.incarichi.map(
+                      ({ incarico, conteggi, giocatori_assegnati }) => (
+                        <Box
+                          id={`incarico-${incarico.id}`}
+                          key={incarico.id}
+                          sx={{
+                            position: "relative",
+                            borderBottom: "1px solid",
+                            borderColor: "divider",
+                            "&:last-child": {
+                              borderBottom: 0,
+                            },
+                            transition: "background-color 0.5s ease",
+                            overflow: "visible", // Aggiunto per assicurare che il pulsante del menu rimanga visibile
+                          }}
+                        >
+                          {/* Riga principale dell'incarico */}
                           <Box
                             sx={{
-                            width: "24px",
-                            bgcolor: "rgb(33, 150, 243, 0.1)",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            alignSelf: "stretch"
+                              display: "flex",
+                              alignItems: "center",
+                              width: "100%",
+                              pr: 6, // Spazio per il menu
+                              py: 0.25, // Ridotto da default a 0.25
                             }}
                           >
-                            <Typography 
-                              sx={{ 
-                              fontSize: "0.65rem",
-                              fontStyle: "italic",
-                              color: "rgb(33, 150, 243)",
-                              width: "3ch",
-                              textAlign: "center",
+                            {/* Contatori cliccabili */}
+                            <Box
+                              sx={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 0.25, // Ridotto da 0.5 a 0.25
+                                p: 0.5, // Ridotto da 1 a 0.5
                               }}
                             >
-                              {incarico.livello_minimo}
-                            </Typography>
-                          </Box>
+                              <Tooltip title="Farm attive/completate">
+                                <Chip
+                                  label={`${conteggi.totaleAttive}/${conteggi.completateAttive}`}
+                                  size="small"
+                                  sx={{
+                                    height: 14, // Ridotto da 16 a 14
+                                    minWidth: "auto",
+                                    bgcolor:
+                                      conteggi.totaleAttive === 0
+                                        ? "rgb(0, 0, 0, 0.03)"
+                                        : "rgb(33, 150, 243, 0.1)",
+                                    color:
+                                      conteggi.totaleAttive === 0
+                                        ? "rgb(0, 0, 0, 0.6)"
+                                        : "rgb(33, 150, 243)",
+                                    "& .MuiChip-label": {
+                                      px: 0.75, // Ridotto da 1 a 0.75
+                                      fontSize: "0.6rem", // Ridotto da 0.65rem a 0.6rem
+                                      lineHeight: 1,
+                                      fontWeight: 400,
+                                    },
+                                  }}
+                                  onClick={() => {
+                                    if (conteggi.totaleAttive > 0) {
+                                      handleToggleGiocatori(
+                                        incarico.id,
+                                        "attivi"
+                                      );
+                                    } else if (conteggi.completateAttive > 0) {
+                                      handleToggleGiocatori(
+                                        incarico.id,
+                                        "completati_attivi"
+                                      );
+                                    }
+                                  }}
+                                />
+                              </Tooltip>
 
-                        {/* Box per immagine e quantità */}
+                              <Tooltip title="Farm inattive/completate">
+                                <Chip
+                                  label={`${conteggi.totaleInattive}/${conteggi.completateInattive}`}
+                                  size="small"
+                                  sx={{
+                                    height: 14, // Ridotto da 16 a 14
+                                    minWidth: "auto",
+                                    bgcolor: "rgb(0, 0, 0, 0.03)",
+                                    color: "rgb(0, 0, 0, 0.6)",
+                                    "& .MuiChip-label": {
+                                      px: 0.75, // Ridotto da 1 a 0.75
+                                      fontSize: "0.6rem", // Ridotto da 0.65rem a 0.6rem
+                                      lineHeight: 1,
+                                    },
+                                  }}
+                                  onClick={() => {
+                                    if (conteggi.totaleInattive > 0) {
+                                      handleToggleGiocatori(
+                                        incarico.id,
+                                        "inattivi"
+                                      );
+                                    } else if (
+                                      conteggi.completateInattive > 0
+                                    ) {
+                                      handleToggleGiocatori(
+                                        incarico.id,
+                                        "completati_inattivi"
+                                      );
+                                    }
+                                  }}
+                                />
+                              </Tooltip>
+                            </Box>
+
+                            {/* Strisciolina del livello */}
                             <Box
-                              sx={{ 
-                            display: "flex",
-                            alignItems: "center",
-                                p: 1,
-                            width: { xs: "80px", sm: "100px" },
-                                flexShrink: 0
+                              sx={{
+                                width: "18px", // Ridotto da 24px a 18px
+                                bgcolor: "rgb(33, 150, 243, 0.1)",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                alignSelf: "stretch",
+                              }}
+                            >
+                              <Typography
+                                sx={{
+                                  fontSize: "0.6rem", // Mantenuto a 0.6rem
+                                  fontStyle: "italic",
+                                  color: "rgb(33, 150, 243)",
+                                  width: "100%", // Cambiato da 2ch a 100% per adattarsi meglio
+                                  textAlign: "center", // Mantenuto centrato
+                                  lineHeight: 1, // Aggiunto per migliorare l'allineamento verticale
+                                  padding: "0 1px", // Aggiunto padding orizzontale minimo
+                                }}
+                              >
+                                {incarico.livello_minimo}
+                              </Typography>
+                            </Box>
+
+                            {/* Box per immagine e quantità */}
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                p: 0.5, // Ridotto da 1 a 0.5
+                                width: { xs: "70px", sm: "80px" }, // Ridotto da 80px/100px a 70px/80px
+                                flexShrink: 0,
+                                mr: 0, // Rimosso il margine destro per avvicinare alla sezione successiva
                               }}
                             >
                               <Avatar
                                 src={incarico.immagine}
                                 variant="rounded"
-                                sx={{ width: 32, height: 32, mr: 1 }}
+                                sx={{ width: 24, height: 24, mr: 0.5 }} // Ridotto da 32x32 a 24x24 e margine da 1 a 0.5
                               >
                                 {incarico.nome[0]}
                               </Avatar>
                               <Typography
                                 variant="body2"
-                                sx={{ 
+                                sx={{
                                   border: 1,
-                              borderColor: "divider",
+                                  borderColor: "divider",
                                   borderRadius: 1,
-                                  px: 0.5,
-                                  py: 0.25,
-                              fontSize: "0.75rem",
-                              minWidth: "32px",
-                              textAlign: "center",
+                                  px: 0.25, // Ridotto da 0.5 a 0.25
+                                  py: 0, // Ridotto da 0.25 a 0
+                                  fontSize: "0.65rem", // Ridotto da 0.75rem a 0.65rem
+                                  minWidth: "24px", // Ridotto da 32px a 24px
+                                  textAlign: "center",
                                 }}
                               >
                                 x{getQuantitaIncarico(incarico)}
                               </Typography>
                             </Box>
 
-                        {/* Box per il nome e i tag */}
-                        <Box
-                          sx={{
-                            display: "flex",
-                            flexDirection: "column",
-                            justifyContent: "center",
-                              py: 1,
-                            px: 1,
-                            flexGrow: 1,
-                            minWidth: 0
-                          }}
-                        >
-                                <Typography
-                                  variant="body2"
-                                  sx={{ 
-                                    fontSize: '0.875rem',
-                              lineHeight: 1.2,
-                              maxWidth: '100%',
-                              wordBreak: 'break-word',
-                              display: '-webkit-box',
-                              WebkitLineClamp: 2,
-                              WebkitBoxOrient: 'vertical',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                              fontWeight: 'normal'  // Aggiungo questa proprietà per assicurarmi che il testo non diventi mai in grassetto
-                                  }}
-                                >
-                                  {incarico.nome}
-                                </Typography>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              flexDirection: "row",
-                                  gap: 0.5, 
-                                  mt: 0.5,
-                              flexWrap: "wrap"
-                            }}
-                          >
-                                  {incarico.is_obbligatorio && (
-                                    <Chip
-                                      label="Obbligatorio"
-                                      size="small"
-                                      sx={{ 
-                                        height: 16,
-                                  width: "fit-content",
-                                  bgcolor: "#ff8c00",
-                                  color: "white",
-                                  "& .MuiChip-label": {
-                                          px: 0.5,
-                                    fontSize: "0.625rem",
-                                  },
-                                      }}
-                                    />
-                                  )}
-                                  {(() => {
-                                    const cestoContenitore = trovaCestoPerIncarico(incarico.id);
-                                    if (!cestoContenitore) return null;
-                                    
-                                    return (
-                                      <Chip
-                                        label={cestoContenitore.nome}
-                                        size="small"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          scrollToCesto(cestoContenitore.id);
-                                        }}
-                                        sx={{ 
-                                          height: 16,
-                                    width: "fit-content",
-                                    display: "inline-flex",
-                                    bgcolor: "#d4a76a",
-                                    color: "white",
-                                    cursor: "pointer",
-                                    "& .MuiChip-label": {
-                                            px: 0.5,
-                                      fontSize: "0.625rem",
-                                      display: "block",
-                                      whiteSpace: "nowrap",
-                                    },
-                                    "&:hover": {
-                                      bgcolor: "#c39355",
-                                    },
-                                        }}
-                                      />
-                                    );
-                                  })()}
-                                </Box>
-                              </Box>
-                            </Box>
-
-                            {/* Pulsante menu */}
-                            <IconButton
-                              size="small"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                          setAnchorEl({
-                            id: incarico.id,
-                            element: event.currentTarget,
-                          });
-                              }}
-                              sx={{ 
-                          position: "absolute",
-                          right: 8,
-                          top: "50%",
-                          transform: "translateY(-50%)",
-                                width: 28,
-                                height: 28,
-                          color: "text.secondary"
+                            {/* Box per il nome e i tag */}
+                            <Box
+                              sx={{
+                                display: "flex",
+                                flexDirection: "column",
+                                justifyContent: "center",
+                                py: 0.25, // Ridotto da 1 a 0.25
+                                px: 0.25, // Ridotto da 0.5 a 0.25 per avvicinare al box precedente
+                                flexGrow: 1,
+                                minWidth: 0,
+                                ml: 0, // Rimosso il margine sinistro per avvicinare alla sezione precedente
                               }}
                             >
-                              <MoreVertIcon sx={{ fontSize: 20 }} />
-                            </IconButton>
-
-                      {/* Area espandibile per i giocatori assegnati */}
-                      <Collapse
-                        in={[
-                          "attivi",
-                          "inattivi",
-                          "completati_attivi",
-                          "completati_inattivi",
-                        ].some((tipo) =>
-                          expandedIncarichi.includes(`${incarico.id}_${tipo}`)
-                        )}
-                      >
-                        <Box sx={{ pl: 5, pr: 2, py: 1 }}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: 2,
-                            }}
-                          >
-                            {/* Sezione Assegnati */}
-                            <Box>
                               <Typography
-                                variant="caption"
+                                variant="body2"
                                 sx={{
-                                  color: "text.primary",
-                                  fontWeight: 700,
-                                  display: "block",
-                                  mb: 1,
+                                  fontSize: "0.75rem", // Ridotto da 0.875rem a 0.75rem
+                                  lineHeight: 1.1, // Ridotto da 1.2 a 1.1
+                                  maxWidth: "100%",
+                                  wordBreak: "break-word",
+                                  display: "-webkit-box",
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: "vertical",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  fontWeight: "normal",
                                 }}
                               >
-                                ASSEGNATI
+                                {incarico.nome}
                               </Typography>
-
-                              {/* Farm attive assegnate */}
-                              {assegnazioni
-                                .filter(
-                                  (a) =>
-                                    a.tipo === "incarico" &&
-                                    a.riferimento_id === incarico.id
-                                )
-                                .map((ass) => {
-                                  const farm = farms.find(
-                                    (f) => f.farmId === ass.farm_id
-                                  );
-                                  if (!farm || !farm.isAttiva) return null;
-                                  
-                                  const progresso = getProgressoIncarico(
-                                    incarico.id,
-                                    farm.id
-                                  );
-                                  const completamenti = getCompletamentiIncarico(
-                                    progresso,
-                                    incarico.quantita
-                                  );
-                                  const isCompletato = completamenti > 0;
-
-                                  return (
-                                    <Box
-                                      key={farm.id}
-                                      sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 1,
-                                      }}
-                                    >
-                                      <Box
-                                        sx={{
-                                          width: 20,
-                                          height: 20,
-                                        borderRadius: "50%",
-                                          ...(isCompletato
-                                          ? { bgcolor: "rgb(33, 150, 243)" }
-                                          : {
-                                              border:
-                                                "2px solid rgb(33, 150, 243)",
-                                            }),
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                      }}
-                                    />
-                                    <Typography
-                                      sx={{ fontSize: "0.875rem" }}
-                                    >
-                                        {`${farm.giocatore_nome} - ${farm.nome}`}
-                                      </Typography>
-                                      <IconButton
-                                        size="small"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          e.preventDefault();
-                                        handleRimuoviAssegnazione(
-                                          ass.id,
-                                          "incarico"
-                                        );
-                                      }}
-                                      sx={{ 
-                                        ml: "auto",
-                                          width: 20,
-                                          height: 20,
-                                        color: "text.secondary",
-                                        }}
-                                      >
-                                        <CloseIcon sx={{ fontSize: 16 }} />
-                                      </IconButton>
-                                    </Box>
-                                  );
-                                })}
-
-                              {/* Farm inattive assegnate */}
-                              {assegnazioni
-                                .filter(
-                                  (a) =>
-                                    a.tipo === "incarico" &&
-                                    a.riferimento_id === incarico.id
-                                )
-                                .map((ass) => {
-                                  const farm = farms.find(
-                                    (f) => f.farmId === ass.farm_id
-                                  );
-                                  if (!farm || farm.isAttiva) return null;
-                                  
-                                  const progresso = getProgressoIncarico(
-                                    incarico.id,
-                                    farm.id
-                                  );
-                                  const completamenti = getCompletamentiIncarico(
-                                    progresso,
-                                    incarico.quantita
-                                  );
-                                  const isCompletato = completamenti > 0;
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  flexDirection: "row",
+                                  gap: 0.25, // Ridotto da 0.5 a 0.25
+                                  mt: 0.25, // Ridotto da 0.5 a 0.25
+                                  flexWrap: "wrap",
+                                }}
+                              >
+                                {incarico.is_obbligatorio && (
+                                  <Chip
+                                    label="Obbligatorio"
+                                    size="small"
+                                    sx={{
+                                      height: 14, // Ridotto da 16 a 14
+                                      width: "fit-content",
+                                      bgcolor: "#ff8c00",
+                                      color: "white",
+                                      "& .MuiChip-label": {
+                                        px: 0.25, // Ridotto da 0.5 a 0.25
+                                        fontSize: "0.6rem", // Ridotto da 0.625rem a 0.6rem
+                                      },
+                                    }}
+                                  />
+                                )}
+                                {(() => {
+                                  const cestoContenitore =
+                                    trovaCestoPerIncarico(incarico.id);
+                                  if (!cestoContenitore) return null;
 
                                   return (
-                                    <Box
-                                      key={farm.id}
-                                      sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      gap: 1,
+                                    <Chip
+                                      label={cestoContenitore.nome}
+                                      size="small"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        scrollToCesto(cestoContenitore.id);
                                       }}
-                                    >
-                                      <Box
-                                        sx={{
-                                          width: 20,
-                                          height: 20,
-                                        borderRadius: "50%",
-                                          ...(isCompletato
-                                          ? { bgcolor: "rgba(0, 0, 0, 0.2)" }
-                                          : {
-                                              border:
-                                                "2px solid rgba(0, 0, 0, 0.2)",
-                                            }),
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
+                                      sx={{
+                                        height: 14, // Ridotto da 16 a 14
+                                        width: "fit-content",
+                                        display: "inline-flex",
+                                        bgcolor: "#d4a76a",
+                                        color: "white",
+                                        cursor: "pointer",
+                                        "& .MuiChip-label": {
+                                          px: 0.25, // Ridotto da 0.5 a 0.25
+                                          fontSize: "0.6rem", // Ridotto da 0.65rem a 0.6rem
+                                          display: "block",
+                                          whiteSpace: "nowrap",
+                                          lineHeight: 1,
+                                        },
+                                        "&:hover": {
+                                          bgcolor: "#c39355",
+                                        },
                                       }}
                                     />
-                                    <Typography
-                                      sx={{
-                                        fontSize: "0.875rem",
-                                        color: "text.secondary",
-                                      }}
-                                    >
-                                        {`${farm.giocatore_nome} - ${farm.nome}`}
-                                      </Typography>
-                                      <IconButton
-                                        size="small"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          e.preventDefault();
-                                        handleRimuoviAssegnazione(
-                                          ass.id,
-                                          "incarico"
-                                        );
-                                      }}
-                                      sx={{ 
-                                        ml: "auto",
-                                          width: 20,
-                                          height: 20,
-                                        color: "text.secondary",
-                                        }}
-                                      >
-                                        <CloseIcon sx={{ fontSize: 16 }} />
-                                      </IconButton>
-                                    </Box>
                                   );
-                                })}
+                                })()}
+                              </Box>
                             </Box>
+                          </Box>
 
-                            {/* Sezione Completati non assegnati */}
-                            {(conteggi.completateSenzaAssegnazioneAttive >
-                              0 ||
-                              conteggi.completateSenzaAssegnazioneInattive >
-                                0) && (
-                              <Box>
-                                <Typography
-                                  variant="caption"
-                                  sx={{
-                                    color: "text.primary",
-                                    fontWeight: 700,
-                                    display: "block",
-                                    mb: 1,
-                                  }}
-                                >
-                                  COMPLETATI (NON ASSEGNATI)
-                                </Typography>
+                          {/* Pulsante menu */}
+                          <IconButton
+                            size="small"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setAnchorEl({
+                                id: incarico.id,
+                                element: event.currentTarget,
+                              });
+                            }}
+                            sx={{
+                              position: "absolute",
+                              right: 4, // Ridotto da 8 a 4
+                              top: 12, // Posizione fissa dall'alto invece di 50%
+                              transform: "none", // Rimuovo il transform
+                              width: 20, // Ridotto da 28 a 20
+                              height: 20, // Ridotto da 28 a 20
+                              color: "text.secondary",
+                              zIndex: 10, // Aumentato per assicurarsi che sia sopra tutto
+                            }}
+                          >
+                            <MoreVertIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
 
-                                {/* Farm attive con completamenti */}
-                                {conteggi.completateSenzaAssegnazioneAttive >
-                                  0 && (
-                                  <Box sx={{ mb: 2 }}>
-                                    <Typography
-                                      variant="caption"
-                                      sx={{
-                                        color: "rgb(33, 150, 243)",
-                                        fontWeight: 500,
-                                        display: "block",
-                                        mb: 0.5,
-                                      }}
-                                    >
-                                      ATTIVI
-                                    </Typography>
-                                    <Box
-                                      sx={{
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        gap: 0.5,
-                                      }}
-                                    >
-                                      {farms
-                                        .filter((farm) => {
-                                          if (!farm.isAttiva) return false;
-                                          const progresso = getProgressoIncarico(
-                                            incarico.id,
-                                            farm.id
-                                          );
-                                          const completamenti =
-                                            getCompletamentiIncarico(
-                                              progresso,
-                                              incarico.quantita
-                                            );
-                                          const haAssegnazione =
-                                            assegnazioni.some(
-                                              (a) =>
-                                                a.tipo === "incarico" &&
-                                                a.riferimento_id ===
-                                                  incarico.id &&
-                                              a.farm_id === farm.id
-                                          );
-                                          return (
-                                            completamenti > 0 && !haAssegnazione
-                                          );
-                                        })
-                                        .sort((a, b) => {
-                                          const nomeA = a.giocatore_nome || "";
-                                          const nomeB = b.giocatore_nome || "";
-                                          return nomeA.localeCompare(nomeB);
-                                        })
-                                        .map((farm) => (
+                          {/* Area espandibile per i giocatori assegnati */}
+                          <Collapse
+                            in={[
+                              "attivi",
+                              "inattivi",
+                              "completati_attivi",
+                              "completati_inattivi",
+                            ].some((tipo) =>
+                              expandedIncarichi.includes(
+                                `${incarico.id}_${tipo}`
+                              )
+                            )}
+                          >
+                            <Box
+                              sx={{
+                                pl: 5,
+                                pr: 2,
+                                py: 1,
+                                position: "relative", // Aggiunto per creare un nuovo contesto di posizionamento
+                                zIndex: 1, // Assicura che sia sotto il pulsante del menu
+                                marginRight: "20px", // Aggiunto per lasciare spazio al pulsante del menu
+                              }}
+                            >
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: 2,
+                                }}
+                              >
+                                {/* Sezione Assegnati */}
+                                <Box>
+                                  <Typography
+                                    variant="caption"
+                                    sx={{
+                                      color: "text.primary",
+                                      fontWeight: 700,
+                                      display: "block",
+                                      mb: 1,
+                                    }}
+                                  >
+                                    ASSEGNATI
+                                  </Typography>
+
+                                  {/* Farm attive assegnate */}
+                                  {assegnazioni
+                                    .filter(
+                                      (a) =>
+                                        a.tipo === "incarico" &&
+                                        a.riferimento_id === incarico.id
+                                    )
+                                    .map((ass) => {
+                                      const farm = farms.find(
+                                        (f) => f.farmId === ass.farm_id
+                                      );
+                                      if (!farm || !farm.isAttiva) return null;
+
+                                      const progresso = getProgressoIncarico(
+                                        incarico.id,
+                                        farm.id
+                                      );
+                                      const completamenti =
+                                        getCompletamentiIncarico(
+                                          progresso,
+                                          incarico.quantita
+                                        );
+                                      const isCompletato = completamenti > 0;
+
+                                      return (
+                                        <Box
+                                          key={farm.id}
+                                          sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 1,
+                                          }}
+                                        >
                                           <Box
-                                            key={farm.id}
                                             sx={{
+                                              width: 20,
+                                              height: 20,
+                                              borderRadius: "50%",
+                                              ...(isCompletato
+                                                ? {
+                                                    bgcolor:
+                                                      "rgb(33, 150, 243)",
+                                                  }
+                                                : {
+                                                    border:
+                                                      "2px solid rgb(33, 150, 243)",
+                                                  }),
                                               display: "flex",
                                               alignItems: "center",
-                                              gap: 1,
+                                              justifyContent: "center",
+                                            }}
+                                          />
+                                          <Typography
+                                            sx={{ fontSize: "0.875rem" }}
+                                          >
+                                            {`${farm.giocatore_nome} - ${farm.nome}`}
+                                          </Typography>
+                                          <IconButton
+                                            size="small"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              e.preventDefault();
+                                              handleRimuoviAssegnazione(
+                                                ass.id,
+                                                "cesto"
+                                              );
+                                            }}
+                                            sx={{
+                                              ml: "auto",
+                                              width: 20,
+                                              height: 20,
+                                              color: "text.secondary",
                                             }}
                                           >
-                                            <Box
-                                              sx={{
-                                                width: 20,
-                                                height: 20,
-                                                  borderRadius: "50%",
-                                                  bgcolor: "#ffc107",
-                                                  display: "flex",
-                                                  alignItems: "center",
-                                                  justifyContent: "center",
-                                                }}
-                                              />
-                                              <Typography
-                                                sx={{ fontSize: "0.875rem" }}
-                                              >
-                                              {`${farm.giocatore_nome} - ${farm.nome}`}
-                                            </Typography>
-                                            <IconButton
-                                              size="small"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                e.preventDefault();
-                                                handleAssegnaIncarico(
-                                                  incarico.id,
-                                                  farm.id
-                                                );
-                                              }}
-                                              sx={{ 
-                                                  ml: "auto",
-                                                width: 20,
-                                                height: 20,
-                                                  color: "primary.main",
-                                              }}
-                                            >
-                                                <AddIcon
-                                                  sx={{ fontSize: 16 }}
-                                                />
-                                            </IconButton>
-                                          </Box>
-                                        ))}
-                                    </Box>
-                                  </Box>
-                                )}
+                                            <CloseIcon sx={{ fontSize: 16 }} />
+                                          </IconButton>
+                                        </Box>
+                                      );
+                                    })}
 
-                                {/* Farm inattive con completamenti */}
-                                {conteggi.completateSenzaAssegnazioneInattive >
-                                  0 && (
+                                  {/* Farm inattive assegnate */}
+                                  {assegnazioni
+                                    .filter(
+                                      (a) =>
+                                        a.tipo === "incarico" &&
+                                        a.riferimento_id === incarico.id
+                                    )
+                                    .map((ass) => {
+                                      const farm = farms.find(
+                                        (f) => f.farmId === ass.farm_id
+                                      );
+                                      if (!farm || farm.isAttiva) return null;
+
+                                      const progresso = getProgressoIncarico(
+                                        incarico.id,
+                                        farm.id
+                                      );
+                                      const completamenti =
+                                        getCompletamentiIncarico(
+                                          progresso,
+                                          incarico.quantita
+                                        );
+                                      const isCompletato = completamenti > 0;
+
+                                      return (
+                                        <Box
+                                          key={farm.id}
+                                          sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 1,
+                                          }}
+                                        >
+                                          <Box
+                                            sx={{
+                                              width: 20,
+                                              height: 20,
+                                              borderRadius: "50%",
+                                              ...(isCompletato
+                                                ? {
+                                                    bgcolor:
+                                                      "rgba(0, 0, 0, 0.2)",
+                                                  }
+                                                : {
+                                                    border:
+                                                      "2px solid rgba(0, 0, 0, 0.2)",
+                                                  }),
+                                              display: "flex",
+                                              alignItems: "center",
+                                              justifyContent: "center",
+                                            }}
+                                          />
+                                          <Typography
+                                            sx={{
+                                              fontSize: "0.875rem",
+                                              color: "text.secondary",
+                                            }}
+                                          >
+                                            {`${farm.giocatore_nome} - ${farm.nome}`}
+                                          </Typography>
+                                          <IconButton
+                                            size="small"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              e.preventDefault();
+                                              handleRimuoviAssegnazione(
+                                                ass.id,
+                                                "cesto"
+                                              );
+                                            }}
+                                            sx={{
+                                              ml: "auto",
+                                              width: 20,
+                                              height: 20,
+                                              color: "text.secondary",
+                                            }}
+                                          >
+                                            <CloseIcon sx={{ fontSize: 16 }} />
+                                          </IconButton>
+                                        </Box>
+                                      );
+                                    })}
+                                </Box>
+
+                                {/* Sezione Completati non assegnati */}
+                                {(conteggi.completateSenzaAssegnazioneAttive >
+                                  0 ||
+                                  conteggi.completateSenzaAssegnazioneInattive >
+                                    0) && (
                                   <Box>
                                     <Typography
                                       variant="caption"
                                       sx={{
-                                        color: "text.secondary",
-                                        fontWeight: 500,
+                                        color: "text.primary",
+                                        fontWeight: 700,
                                         display: "block",
-                                        mb: 0.5,
+                                        mb: 1,
                                       }}
                                     >
-                                      INATTIVI
+                                      COMPLETATI (NON ASSEGNATI)
                                     </Typography>
-                                    <Box
-                                      sx={{
-                                        display: "flex",
-                                        flexDirection: "column",
-                                        gap: 0.5,
-                                      }}
-                                    >
-                                      {farms
-                                        .filter((farm) => {
-                                          if (farm.isAttiva) return false;
-                                          const progresso = getProgressoIncarico(
-                                            incarico.id,
-                                            farm.id
-                                          );
-                                          const completamenti =
-                                            getCompletamentiIncarico(
-                                              progresso,
-                                              incarico.quantita
-                                            );
-                                          const haAssegnazione =
-                                            assegnazioni.some(
-                                              (a) =>
-                                                a.tipo === "incarico" &&
-                                                a.riferimento_id ===
-                                                  incarico.id &&
-                                              a.farm_id === farm.id
-                                          );
-                                          return (
-                                            completamenti > 0 && !haAssegnazione
-                                          );
-                                        })
-                                        .sort((a, b) => {
-                                          const nomeA = a.giocatore_nome || "";
-                                          const nomeB = b.giocatore_nome || "";
-                                          return nomeA.localeCompare(nomeB);
-                                        })
-                                        .map((farm) => (
-                                          <Box
-                                            key={farm.id}
-                                            sx={{
-                                              display: "flex",
-                                              alignItems: "center",
-                                              gap: 1,
-                                            }}
-                                          >
-                                            <Box
-                                              sx={{
-                                                width: 20,
-                                                height: 20,
-                                                  borderRadius: "50%",
-                                                  bgcolor: "#8d6e63",
-                                                  display: "flex",
-                                                  alignItems: "center",
-                                                  justifyContent: "center",
-                                                }}
-                                              />
-                                              <Typography
-                                                sx={{
-                                                  fontSize: "0.875rem",
-                                                  color: "text.secondary",
-                                                }}
-                                              >
-                                              {`${farm.giocatore_nome} - ${farm.nome}`}
-                                            </Typography>
-                                            <IconButton
-                                              size="small"
-                                              onClick={(e) => {
-                                                e.stopPropagation();
-                                                e.preventDefault();
-                                                handleAssegnaIncarico(
+
+                                    {/* Farm attive con completamenti */}
+                                    {conteggi.completateSenzaAssegnazioneAttive >
+                                      0 && (
+                                      <Box sx={{ mb: 2 }}>
+                                        <Typography
+                                          variant="caption"
+                                          sx={{
+                                            color: "rgb(33, 150, 243)",
+                                            fontWeight: 500,
+                                            display: "block",
+                                            mb: 0.5,
+                                          }}
+                                        >
+                                          ATTIVI
+                                        </Typography>
+                                        <Box
+                                          sx={{
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            gap: 0.5,
+                                          }}
+                                        >
+                                          {farms
+                                            .filter((farm) => {
+                                              if (!farm.isAttiva) return false;
+                                              const progresso =
+                                                getProgressoIncarico(
                                                   incarico.id,
                                                   farm.id
                                                 );
-                                              }}
-                                              sx={{ 
-                                                  ml: "auto",
-                                                width: 20,
-                                                height: 20,
-                                                  color: "primary.main",
-                                              }}
-                                            >
-                                                <AddIcon
-                                                  sx={{ fontSize: 16 }}
+                                              const completamenti =
+                                                getCompletamentiIncarico(
+                                                  progresso,
+                                                  incarico.quantita
+                                                );
+                                              const haAssegnazione =
+                                                assegnazioni.some(
+                                                  (a) =>
+                                                    a.tipo === "incarico" &&
+                                                    a.riferimento_id ===
+                                                      incarico.id &&
+                                                    a.farm_id === farm.id
+                                                );
+                                              return (
+                                                completamenti > 0 &&
+                                                !haAssegnazione
+                                              );
+                                            })
+                                            .sort((a, b) => {
+                                              const nomeA =
+                                                a.giocatore_nome || "";
+                                              const nomeB =
+                                                b.giocatore_nome || "";
+                                              return nomeA.localeCompare(nomeB);
+                                            })
+                                            .map((farm) => (
+                                              <Box
+                                                key={farm.id}
+                                                sx={{
+                                                  display: "flex",
+                                                  alignItems: "center",
+                                                  gap: 1,
+                                                }}
+                                              >
+                                                <Box
+                                                  sx={{
+                                                    width: 20,
+                                                    height: 20,
+                                                    borderRadius: "50%",
+                                                    bgcolor: "#ffc107",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                  }}
                                                 />
-                                            </IconButton>
-                                          </Box>
-                                        ))}
-                                    </Box>
+                                                <Typography
+                                                  sx={{ fontSize: "0.875rem" }}
+                                                >
+                                                  {`${farm.giocatore_nome} - ${farm.nome}`}
+                                                </Typography>
+                                                <IconButton
+                                                  size="small"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    e.preventDefault();
+                                                    handleAssegnaIncarico(
+                                                      incarico.id,
+                                                      farm.id
+                                                    );
+                                                  }}
+                                                  sx={{
+                                                    ml: "auto",
+                                                    width: 20,
+                                                    height: 20,
+                                                    color: "primary.main",
+                                                  }}
+                                                >
+                                                  <AddIcon
+                                                    sx={{ fontSize: 16 }}
+                                                  />
+                                                </IconButton>
+                                              </Box>
+                                            ))}
+                                        </Box>
+                                      </Box>
+                                    )}
+
+                                    {/* Farm inattive con completamenti */}
+                                    {conteggi.completateSenzaAssegnazioneInattive >
+                                      0 && (
+                                      <Box>
+                                        <Typography
+                                          variant="caption"
+                                          sx={{
+                                            color: "text.secondary",
+                                            fontWeight: 500,
+                                            display: "block",
+                                            mb: 0.5,
+                                          }}
+                                        >
+                                          INATTIVI
+                                        </Typography>
+                                        <Box
+                                          sx={{
+                                            display: "flex",
+                                            flexDirection: "column",
+                                            gap: 0.5,
+                                          }}
+                                        >
+                                          {farms
+                                            .filter((farm) => {
+                                              if (farm.isAttiva) return false;
+                                              const progresso =
+                                                getProgressoIncarico(
+                                                  incarico.id,
+                                                  farm.id
+                                                );
+                                              const completamenti =
+                                                getCompletamentiIncarico(
+                                                  progresso,
+                                                  incarico.quantita
+                                                );
+                                              const haAssegnazione =
+                                                assegnazioni.some(
+                                                  (a) =>
+                                                    a.tipo === "incarico" &&
+                                                    a.riferimento_id ===
+                                                      incarico.id &&
+                                                    a.farm_id === farm.id
+                                                );
+                                              return (
+                                                completamenti > 0 &&
+                                                !haAssegnazione
+                                              );
+                                            })
+                                            .sort((a, b) => {
+                                              const nomeA =
+                                                a.giocatore_nome || "";
+                                              const nomeB =
+                                                b.giocatore_nome || "";
+                                              return nomeA.localeCompare(nomeB);
+                                            })
+                                            .map((farm) => (
+                                              <Box
+                                                key={farm.id}
+                                                sx={{
+                                                  display: "flex",
+                                                  alignItems: "center",
+                                                  gap: 1,
+                                                }}
+                                              >
+                                                <Box
+                                                  sx={{
+                                                    width: 20,
+                                                    height: 20,
+                                                    borderRadius: "50%",
+                                                    bgcolor: "#8d6e63",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center",
+                                                  }}
+                                                />
+                                                <Typography
+                                                  sx={{
+                                                    fontSize: "0.875rem",
+                                                    color: "text.secondary",
+                                                  }}
+                                                >
+                                                  {`${farm.giocatore_nome} - ${farm.nome}`}
+                                                </Typography>
+                                                <IconButton
+                                                  size="small"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    e.preventDefault();
+                                                    handleAssegnaIncarico(
+                                                      incarico.id,
+                                                      farm.id
+                                                    );
+                                                  }}
+                                                  sx={{
+                                                    ml: "auto",
+                                                    width: 20,
+                                                    height: 20,
+                                                    color: "primary.main",
+                                                  }}
+                                                >
+                                                  <AddIcon
+                                                    sx={{ fontSize: 16 }}
+                                                  />
+                                                </IconButton>
+                                              </Box>
+                                            ))}
+                                        </Box>
+                                      </Box>
+                                    )}
                                   </Box>
                                 )}
                               </Box>
-                            )}
-                          </Box>
+                            </Box>
+                          </Collapse>
                         </Box>
-                      </Collapse>
-                    </Box>
-                  )
-                )}
-                </Collapse>
-              </Paper>
-            );
-          })}
+                      )
+                    )}
+                  </Collapse>
+                </Paper>
+              );
+            })}
         </Box>
 
         {/* Menu per assegnare gli incarichi e i cesti */}
@@ -4070,27 +4212,27 @@ export default function GestioneAssegnazioni() {
           disablePortal // Previene l'errore aria-hidden
           slotProps={{
             paper: {
-              sx: { 
-              maxHeight: "70vh",
-              width: 250,
+              sx: {
+                maxHeight: "70vh",
+                width: 250,
+              },
             },
-          },
           }}
         >
           {(() => {
             if (!anchorEl?.id) return null;
 
-          const isCesto = anchorEl.id.startsWith("cesto_");
-          const isCitta = anchorEl.id.startsWith("citta_");
-          const id =
-            isCesto || isCitta ? anchorEl.id.split("_")[1] : anchorEl.id;
-            
-            const item = isCesto 
-            ? cesti.find((c) => c.id === id)
+            const isCesto = anchorEl.id.startsWith("cesto_");
+            const isCitta = anchorEl.id.startsWith("citta_");
+            const id =
+              isCesto || isCitta ? anchorEl.id.split("_")[1] : anchorEl.id;
+
+            const item = isCesto
+              ? cesti.find((c) => c.id === id)
               : isCitta
-            ? incarichiCitta.find((i) => i.id === id)
-            : incarichi.find((i) => i.id === id);
-            
+              ? incarichiCitta.find((i) => i.id === id)
+              : incarichi.find((i) => i.id === id);
+
             if (!item) return null;
 
             // Calcolo del livello minimo in base al tipo
@@ -4098,10 +4240,10 @@ export default function GestioneAssegnazioni() {
             if (isCesto) {
               const cestoItem = item as Cesto;
               const livelliIncarichi = cestoItem.incarichi
-              .map((i) => incarichi.find((inc) => inc.id === i.incarico_id))
+                .map((i) => incarichi.find((inc) => inc.id === i.incarico_id))
                 .filter((i): i is Incarico => i !== undefined)
-              .map((i) => i.livello_minimo);
-              
+                .map((i) => i.livello_minimo);
+
               livelloMinimo = Math.max(...livelliIncarichi);
             } else if (isCitta) {
               livelloMinimo = (item as IncaricoCitta).livello_minimo;
@@ -4112,27 +4254,27 @@ export default function GestioneAssegnazioni() {
             // Funzione per ottenere le farm disponibili
             const getFarmDisponibili = () => {
               const farmAssegnate = assegnazioni
-              .filter((a) => {
-                if (isCesto)
-                  return a.tipo === "cesto" && a.riferimento_id === id;
-                if (isCitta)
+                .filter((a) => {
+                  if (isCesto)
+                    return a.tipo === "cesto" && a.riferimento_id === id;
+                  if (isCitta)
+                    return a.tipo === "incarico" && a.riferimento_id === id;
                   return a.tipo === "incarico" && a.riferimento_id === id;
-                return a.tipo === "incarico" && a.riferimento_id === id;
-              })
-              .map((a) => a.farm_id);
+                })
+                .map((a) => a.farm_id);
 
-            return farms.filter(
-              (farm) =>
-                !farmAssegnate.includes(farm.farmId) && 
-                farm.livello >= livelloMinimo
+              return farms.filter(
+                (farm) =>
+                  !farmAssegnate.includes(farm.farmId) &&
+                  farm.livello >= livelloMinimo
               );
             };
 
             const farmDisponibili = getFarmDisponibili();
-          const farmAttive = farmDisponibili.filter((farm) => farm.isAttiva);
-          const farmInattive = farmDisponibili.filter(
-            (farm) => !farm.isAttiva
-          );
+            const farmAttive = farmDisponibili.filter((farm) => farm.isAttiva);
+            const farmInattive = farmDisponibili.filter(
+              (farm) => !farm.isAttiva
+            );
 
             const handleAssegnazione = (farmId: string) => {
               if (isCesto) {
@@ -4145,74 +4287,74 @@ export default function GestioneAssegnazioni() {
 
             return (
               <>
-              <ListSubheader
-                sx={{
-                  py: 0.5,
-                  lineHeight: "24px",
-                  fontSize: "0.75rem",
-                  color: "rgb(33, 150, 243)", // Aggiungo il colore blu
-                }}
-              >
-                Farm Attive
-              </ListSubheader>
-                {farmAttive.map((farm) => (
-                  <MenuItem 
-                    key={farm.id} 
-                    onClick={() => handleAssegnazione(farm.farmId)}
+                <ListSubheader
                   sx={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "flex-start",
                     py: 0.5,
-                    minHeight: "unset",
+                    lineHeight: "24px",
+                    fontSize: "0.75rem",
+                    color: "rgb(33, 150, 243)", // Aggiungo il colore blu
                   }}
                 >
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <Typography sx={{ fontSize: "0.8rem" }}>
-                    {farm.giocatore_nome} - {farm.nome}
-                    </Typography>
-                    <Typography
-                      sx={{
-                        color: "rgb(33, 150, 243)",
-                        fontSize: "0.7rem",
-                        fontStyle: "italic",
-                      }}
-                    >
-                      {farm.livello}
-                    </Typography>
-                  </Box>
-                  {farm.derby_tags && farm.derby_tags.length > 0 && (
-                    <Box
-                      sx={{
-                        display: "flex",
-                        gap: 0.25,
-                        mt: 0.25,
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      {farm.derby_tags.map((tagId) => {
-                        const derbyInfo = derby.find((d) => d.id === tagId);
-                        if (!derbyInfo) return null;
-                        return (
-                          <Chip
-                            key={tagId}
-                            label={derbyInfo.nome}
-                            size="small"
-                            sx={{
-                              height: 14,
-                              fontSize: "0.6rem",
-                              bgcolor: derbyInfo.colore || "#666",
-                              color: "white",
-                              "& .MuiChip-label": { px: 0.5 },
-                            }}
-                          />
-                        );
-                      })}
+                  Farm Attive
+                </ListSubheader>
+                {farmAttive.map((farm) => (
+                  <MenuItem
+                    key={farm.id}
+                    onClick={() => handleAssegnazione(farm.farmId)}
+                    sx={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "flex-start",
+                      py: 0.5,
+                      minHeight: "unset",
+                    }}
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Typography sx={{ fontSize: "0.8rem" }}>
+                        {farm.giocatore_nome} - {farm.nome}
+                      </Typography>
+                      <Typography
+                        sx={{
+                          color: "rgb(33, 150, 243)",
+                          fontSize: "0.7rem",
+                          fontStyle: "italic",
+                        }}
+                      >
+                        {farm.livello}
+                      </Typography>
                     </Box>
-                  )}
+                    {farm.derby_tags && farm.derby_tags.length > 0 && (
+                      <Box
+                        sx={{
+                          display: "flex",
+                          gap: 0.25,
+                          mt: 0.25,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        {farm.derby_tags.map((tagId) => {
+                          const derbyInfo = derby.find((d) => d.id === tagId);
+                          if (!derbyInfo) return null;
+                          return (
+                            <Chip
+                              key={tagId}
+                              label={derbyInfo.nome}
+                              size="small"
+                              sx={{
+                                height: 14,
+                                fontSize: "0.6rem",
+                                bgcolor: derbyInfo.colore || "#666",
+                                color: "white",
+                                "& .MuiChip-label": { px: 0.5 },
+                              }}
+                            />
+                          );
+                        })}
+                      </Box>
+                    )}
                   </MenuItem>
                 ))}
-                
+
                 {farmInattive.length > 0 && (
                   <>
                     <Divider sx={{ my: 0.5 }} />
@@ -4222,7 +4364,7 @@ export default function GestioneAssegnazioni() {
                       Farm Inattive
                     </ListSubheader>
                     {farmInattive.map((farm) => (
-                      <MenuItem 
+                      <MenuItem
                         key={farm.id}
                         onClick={() => handleAssegnazione(farm.farmId)}
                         sx={{
@@ -4238,7 +4380,7 @@ export default function GestioneAssegnazioni() {
                           sx={{ display: "flex", alignItems: "center", gap: 1 }}
                         >
                           <Typography sx={{ fontSize: "0.8rem" }}>
-                        {farm.giocatore_nome} - {farm.nome}
+                            {farm.giocatore_nome} - {farm.nome}
                           </Typography>
                           <Typography
                             sx={{

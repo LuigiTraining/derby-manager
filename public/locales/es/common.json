@@ -1,0 +1,58 @@
+{
+  "app": {
+    "titolo": "Derby Manager",
+    "sottotitolo": "Gestiona tus derbis con facilidad"
+  },
+  "navigazione": {
+    "home": "Inicio",
+    "dashboard": "Panel",
+    "impostazioni": "Configuración",
+    "profilo": "Perfil",
+    "esci": "Cerrar sesión"
+  },
+  "comune": {
+    "salva": "Guardar",
+    "annulla": "Cancelar",
+    "elimina": "Eliminar",
+    "modifica": "Editar",
+    "crea": "Crear",
+    "cerca": "Buscar",
+    "caricamento": "Cargando...",
+    "errore": "Error",
+    "successo": "Éxito",
+    "conferma": "Confirmar",
+    "indietro": "Atrás",
+    "avanti": "Siguiente"
+  },
+  "lingua": {
+    "seleziona": "Seleccionar idioma",
+    "it": "Italiano",
+    "en": "Inglés",
+    "es": "Español",
+    "fr": "Francés"
+  },
+  "barraLaterale": {
+    "home": "Inicio",
+    "annunci": "Anuncios",
+    "wiki": "Wiki",
+    "tutorial": "Tutorial",
+    "regolamenti": "Reglamentos",
+    "dashboard": "Panel",
+    "assegnazioni": "Asignaciones",
+    "listaGlobale": "Lista global",
+    "blocchi": "Bloqueos",
+    "giocatori": "Jugadores",
+    "gestione": "Gestión",
+    "edifici": "Edificios",
+    "città": "Ciudades",
+    "incarichi": "Tareas",
+    "cesti": "Cestas",
+    "derby": "Derby",
+    "statistiche": "Estadísticas",
+    "impostazioni": "Configuración"
+  },
+  "azioni": {
+    "espandi": "Expandir",
+    "comprimi": "Colapsar"
+  }
+}

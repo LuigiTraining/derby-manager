@@ -1,0 +1,58 @@
+{
+  "app": {
+    "titolo": "Derby Manager",
+    "sottotitolo": "Gérez vos derbys facilement"
+  },
+  "navigazione": {
+    "home": "Accueil",
+    "dashboard": "Tableau de bord",
+    "impostazioni": "Paramètres",
+    "profilo": "Profil",
+    "esci": "Déconnexion"
+  },
+  "comune": {
+    "salva": "Enregistrer",
+    "annulla": "Annuler",
+    "elimina": "Supprimer",
+    "modifica": "Modifier",
+    "crea": "Créer",
+    "cerca": "Rechercher",
+    "caricamento": "Chargement...",
+    "errore": "Erreur",
+    "successo": "Succès",
+    "conferma": "Confirmer",
+    "indietro": "Retour",
+    "avanti": "Suivant"
+  },
+  "lingua": {
+    "seleziona": "Sélectionner la langue",
+    "it": "Italien",
+    "en": "Anglais",
+    "es": "Espagnol",
+    "fr": "Français"
+  },
+  "barraLaterale": {
+    "home": "Accueil",
+    "annunci": "Annonces",
+    "wiki": "Wiki",
+    "tutorial": "Tutoriel",
+    "regolamenti": "Règlements",
+    "dashboard": "Tableau de bord",
+    "assegnazioni": "Affectations",
+    "listaGlobale": "Liste globale",
+    "blocchi": "Blocages",
+    "giocatori": "Joueurs",
+    "gestione": "Gestion",
+    "edifici": "Bâtiments",
+    "città": "Villes",
+    "incarichi": "Tâches",
+    "cesti": "Paniers",
+    "derby": "Derby",
+    "statistiche": "Statistiques",
+    "impostazioni": "Paramètres"
+  },
+  "azioni": {
+    "espandi": "Développer",
+    "comprimi": "Réduire"
+  }
+}
