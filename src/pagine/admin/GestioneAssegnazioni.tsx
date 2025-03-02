@@ -53,6 +53,7 @@ import LocationCityIcon from "@mui/icons-material/LocationCity";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import Layout from "../../componenti/layout/Layout";
+import { useTranslation } from "react-i18next";
 import {
   collection,
   query,
@@ -80,6 +81,21 @@ import { Derby } from "../../tipi/derby";
 import { SelectChangeEvent } from "@mui/material/Select";
 
 export default function GestioneAssegnazioni() {
+  // Aggiungo l'hook useTranslation
+  const { t } = useTranslation();
+
+  // Funzione per tradurre il nome dell'incarico
+  const getTranslatedName = useCallback(
+    (nome: string) => {
+      // Verifica se esiste una traduzione per questo incarico
+      const traduzione = t(`incarichi.${nome}`, {
+        defaultValue: nome,
+      });
+      return traduzione;
+    },
+    [t]
+  );
+
   // Stati per i dati
   const [edifici, setEdifici] = useState<Edificio[]>([]);
   const [incarichi, setIncarichi] = useState<Incarico[]>([]);
@@ -238,7 +254,7 @@ export default function GestioneAssegnazioni() {
     (text: string | undefined | null) => {
       if (!searchQuery) return true;
       if (!text) return false;
-      const normalizedText = text
+      const normalizedText = getTranslatedName(text)
         .toLowerCase()
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "");
@@ -248,7 +264,7 @@ export default function GestioneAssegnazioni() {
         .replace(/[\u0300-\u036f]/g, "");
       return normalizedText.includes(normalizedQuery);
     },
-    [searchQuery]
+    [searchQuery, getTranslatedName]
   );
 
   // Funzione per verificare se un incarico corrisponde alla ricerca
@@ -754,17 +770,29 @@ export default function GestioneAssegnazioni() {
             ? totaleB - totaleA || completamentiB - completamentiA
             : totaleA - totaleB || completamentiA - completamentiB;
 
-          return confronto || a.incarico.nome.localeCompare(b.incarico.nome);
+          return (
+            confronto ||
+            getTranslatedName(a.incarico.nome).localeCompare(
+              getTranslatedName(b.incarico.nome)
+            )
+          );
         } else if (ordinamentoAlfabetico) {
           return ordinamentoAlfabeticoInverso
-            ? b.incarico.nome.localeCompare(a.incarico.nome)
-            : a.incarico.nome.localeCompare(b.incarico.nome);
+            ? getTranslatedName(b.incarico.nome).localeCompare(
+                getTranslatedName(a.incarico.nome)
+              )
+            : getTranslatedName(a.incarico.nome).localeCompare(
+                getTranslatedName(b.incarico.nome)
+              );
         } else {
           const compareLivello = ordinamentoLivelloInverso
             ? b.incarico.livello_minimo - a.incarico.livello_minimo
             : a.incarico.livello_minimo - b.incarico.livello_minimo;
           return (
-            compareLivello || a.incarico.nome.localeCompare(b.incarico.nome)
+            compareLivello ||
+            getTranslatedName(a.incarico.nome).localeCompare(
+              getTranslatedName(b.incarico.nome)
+            )
           );
         }
       });
@@ -795,11 +823,20 @@ export default function GestioneAssegnazioni() {
               ? totaleB - totaleA || completamentiB - completamentiA
               : totaleA - totaleB || completamentiA - completamentiB;
 
-            return confronto || a.incarico.nome.localeCompare(b.incarico.nome);
+            return (
+              confronto ||
+              getTranslatedName(a.incarico.nome).localeCompare(
+                getTranslatedName(b.incarico.nome)
+              )
+            );
           } else if (ordinamentoAlfabetico) {
             return ordinamentoAlfabeticoInverso
-              ? b.incarico.nome.localeCompare(a.incarico.nome)
-              : a.incarico.nome.localeCompare(b.incarico.nome);
+              ? getTranslatedName(b.incarico.nome).localeCompare(
+                  getTranslatedName(a.incarico.nome)
+                )
+              : getTranslatedName(a.incarico.nome).localeCompare(
+                  getTranslatedName(b.incarico.nome)
+                );
           } else {
             const compareLivello = ordinamentoLivelloInverso
               ? b.incarico.livello_minimo - a.incarico.livello_minimo
@@ -2680,7 +2717,7 @@ export default function GestioneAssegnazioni() {
                               variant="body2"
                               sx={{ fontSize: "0.75rem", lineHeight: 1.1 }}
                             >
-                              {incarico.nome}
+                              {getTranslatedName(incarico.nome)}
                             </Typography>
                             <Box sx={{ display: "flex", gap: 0.25, mt: 0.25 }}>
                               {(() => {
@@ -3659,7 +3696,7 @@ export default function GestioneAssegnazioni() {
                                   fontWeight: "normal",
                                 }}
                               >
-                                {incarico.nome}
+                                {getTranslatedName(incarico.nome)}
                               </Typography>
                               <Box
                                 sx={{

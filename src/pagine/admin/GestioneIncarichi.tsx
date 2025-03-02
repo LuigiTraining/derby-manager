@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Box,
   Button,
@@ -45,25 +46,36 @@ import {
   InputAdornment,
   Collapse,
   Tooltip,
-} from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import MoreVertIcon from '@mui/icons-material/MoreVert';
-import SearchIcon from '@mui/icons-material/Search';
-import CloseIcon from '@mui/icons-material/Close';
-import ViewListIcon from '@mui/icons-material/ViewList';
-import SortByAlphaIcon from '@mui/icons-material/SortByAlpha';
-import SortIcon from '@mui/icons-material/Sort';
-import Layout from '../../componenti/layout/Layout';
-import { collection, getDocs, doc, setDoc, deleteDoc, query, where, Timestamp, updateDoc, addDoc } from 'firebase/firestore';
-import { db } from '../../configurazione/firebase';
-import { Incarico, IncaricoCitta } from '../../tipi/incarico';
-import { ElementoCitta } from '../../tipi/citta';
-import { Derby } from '../../tipi/derby';
-import UploadImmagine from '../../componenti/comune/UploadImmagine';
+} from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
+import EditIcon from "@mui/icons-material/Edit";
+import DeleteIcon from "@mui/icons-material/Delete";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
+import SearchIcon from "@mui/icons-material/Search";
+import CloseIcon from "@mui/icons-material/Close";
+import ViewListIcon from "@mui/icons-material/ViewList";
+import SortByAlphaIcon from "@mui/icons-material/SortByAlpha";
+import SortIcon from "@mui/icons-material/Sort";
+import Layout from "../../componenti/layout/Layout";
+import {
+  collection,
+  getDocs,
+  doc,
+  setDoc,
+  deleteDoc,
+  query,
+  where,
+  Timestamp,
+  updateDoc,
+  addDoc,
+} from "firebase/firestore";
+import { db } from "../../configurazione/firebase";
+import { Incarico, IncaricoCitta } from "../../tipi/incarico";
+import { ElementoCitta } from "../../tipi/citta";
+import { Derby } from "../../tipi/derby";
+import UploadImmagine from "../../componenti/comune/UploadImmagine";
 
 // Interfaccia per il form
 interface IncaricoForm {
@@ -80,15 +92,15 @@ interface IncaricoForm {
 
 // Form iniziale vuoto
 const formIniziale: IncaricoForm = {
-  nome: '',
+  nome: "",
   quantita: 1,
   quantita_derby: {},
   livello_minimo: 1,
-  immagine: '',
+  immagine: "",
   edificio_id: null,
   is_obbligatorio: false,
   usato_in_cesti: false,
-  derby_tags: []
+  derby_tags: [],
 };
 
 interface EdificioConLivello {
@@ -99,41 +111,61 @@ interface EdificioConLivello {
 }
 
 interface IncaricoCittaForm {
+  id?: string;
   nome: string;
+  descrizione: string;
+  immagine: string;
   quantita: number;
+  quantita_derby?: Record<string, number>;
   livello_minimo: number;
   elemento_id: string;
-  tipo: 'edificio' | 'visitatore';
+  tipo: "edificio" | "visitatore";
   usato_in_cesti: boolean;
   derby_tags: string[];
 }
 
 const formInizialeCitta: IncaricoCittaForm = {
-  nome: '',
+  nome: "",
+  descrizione: "",
+  immagine: "",
   quantita: 1,
   livello_minimo: 1,
-  elemento_id: '',
-  tipo: 'edificio',
+  elemento_id: "",
+  tipo: "edificio",
   usato_in_cesti: false,
-  derby_tags: []
+  derby_tags: [],
 };
 
 // Aggiungo il tipo per la tab attiva
-type TabAttiva = 'standard' | 'citta';
+type TabAttiva = "standard" | "citta";
 
 export default function GestioneIncarichi() {
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
-  
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const { t } = useTranslation();
+
+  // Funzione per tradurre il nome dell'incarico
+  const getTranslatedName = (nome: string) => {
+    // Verifica se esiste una traduzione per questo incarico
+    const traduzione = t(`incarichi.${nome}`, {
+      defaultValue: nome,
+    });
+    return traduzione;
+  };
+
   const [incarichi, setIncarichi] = useState<Incarico[]>([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingIncarico, setEditingIncarico] = useState<Incarico | null>(null);
   const [formData, setFormData] = useState<IncaricoForm>(formIniziale);
-  const [error, setError] = useState<string>('');
-  const [success, setSuccess] = useState<string>('');
-  const [edifici, setEdifici] = useState<{ id: string; nome: string; }[]>([]);
-  const [edificiConIncarichi, setEdificiConIncarichi] = useState<Map<string, Incarico[]>>(new Map());
-  const [edificiDettagli, setEdificiDettagli] = useState<EdificioConLivello[]>([]);
+  const [error, setError] = useState<string>("");
+  const [success, setSuccess] = useState<string>("");
+  const [edifici, setEdifici] = useState<{ id: string; nome: string }[]>([]);
+  const [edificiConIncarichi, setEdificiConIncarichi] = useState<
+    Map<string, Incarico[]>
+  >(new Map());
+  const [edificiDettagli, setEdificiDettagli] = useState<EdificioConLivello[]>(
+    []
+  );
   const [expandedEdifici, setExpandedEdifici] = useState<string[]>([]);
   const [tuttiEspansi, setTuttiEspansi] = useState(false);
   const [openDialogCitta, setOpenDialogCitta] = useState(false);
@@ -147,26 +179,34 @@ export default function GestioneIncarichi() {
     livello_minimo: number;
     usato_in_cesti: boolean;
     elemento_id: string;
+    tipo?: "edificio" | "visitatore";
+    derby_tags?: string[];
   }>({
-    nome: '',
-    descrizione: '',
-    immagine: '',
+    nome: "",
+    descrizione: "",
+    immagine: "",
     quantita: 1,
-    quantita_derby: {},
     livello_minimo: 1,
     usato_in_cesti: false,
-    elemento_id: '',
+    elemento_id: "",
+    tipo: "edificio",
+    derby_tags: [],
   });
   const [elementiCitta, setElementiCitta] = useState<ElementoCitta[]>([]);
-  const [tipoIncaricoCitta, setTipoIncaricoCitta] = useState<'edificio' | 'visitatore'>('edificio');
-  const [tabAttiva, setTabAttiva] = useState<TabAttiva>('standard');
+  const [tipoIncaricoCitta, setTipoIncaricoCitta] = useState<
+    "edificio" | "visitatore"
+  >("edificio");
+  const [tabAttiva, setTabAttiva] = useState<TabAttiva>("standard");
   const [incarichiCitta, setIncarichiCitta] = useState<IncaricoCitta[]>([]);
   const [derby, setDerby] = useState<Derby[]>([]);
-  const [anchorEl, setAnchorEl] = useState<{ id: string, element: HTMLElement } | null>(null);
+  const [anchorEl, setAnchorEl] = useState<{
+    id: string;
+    element: HTMLElement;
+  } | null>(null);
 
   // Stati per la ricerca
   const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const [visualizzazioneLineare, setVisualizzazioneLineare] = useState(() => {
@@ -185,13 +225,14 @@ export default function GestioneIncarichi() {
     }
   });
 
-  const [ordinamentoAlfabeticoInverso, setOrdinamentoAlfabeticoInverso] = useState(() => {
-    try {
-      return localStorage.getItem("ordinamentoAlfabeticoInverso") === "true";
-    } catch {
-      return false;
-    }
-  });
+  const [ordinamentoAlfabeticoInverso, setOrdinamentoAlfabeticoInverso] =
+    useState(() => {
+      try {
+        return localStorage.getItem("ordinamentoAlfabeticoInverso") === "true";
+      } catch {
+        return false;
+      }
+    });
 
   const [ordinamentoLivello, setOrdinamentoLivello] = useState(() => {
     try {
@@ -201,13 +242,15 @@ export default function GestioneIncarichi() {
     }
   });
 
-  const [ordinamentoLivelloInverso, setOrdinamentoLivelloInverso] = useState(() => {
-    try {
-      return localStorage.getItem("ordinamentoLivelloInverso") === "true";
-    } catch {
-      return false;
+  const [ordinamentoLivelloInverso, setOrdinamentoLivelloInverso] = useState(
+    () => {
+      try {
+        return localStorage.getItem("ordinamentoLivelloInverso") === "true";
+      } catch {
+        return false;
+      }
     }
-  });
+  );
 
   // Effetto per il focus automatico
   useEffect(() => {
@@ -219,116 +262,135 @@ export default function GestioneIncarichi() {
   }, [searchOpen]);
 
   // Funzione per la ricerca
-  const matchSearch = useCallback((text: string): boolean => {
-    if (!searchQuery) return true;
-    return text.toLowerCase().includes(searchQuery.toLowerCase());
-  }, [searchQuery]);
+  const matchSearch = useCallback(
+    (text: string): boolean => {
+      if (!searchQuery) return true;
+      return text.toLowerCase().includes(searchQuery.toLowerCase());
+    },
+    [searchQuery]
+  );
 
   // Effetto per gestire l'espansione automatica quando si cerca
   useEffect(() => {
     if (searchQuery) {
       // Trova tutti gli edifici che contengono incarichi che corrispondono alla ricerca
       const edificiDaEspandere = edificiDettagli
-        .filter(edificio => {
-          const incarichiEdificio = incarichi.filter(i => i.edificio_id === edificio.id);
-          return incarichiEdificio.some(i => i.nome.toLowerCase().includes(searchQuery.toLowerCase())) ||
-                 edificio.nome.toLowerCase().includes(searchQuery.toLowerCase());
+        .filter((edificio) => {
+          const incarichiEdificio = incarichi.filter(
+            (i) => i.edificio_id === edificio.id
+          );
+          return (
+            incarichiEdificio.some((i) =>
+              i.nome.toLowerCase().includes(searchQuery.toLowerCase())
+            ) || edificio.nome.toLowerCase().includes(searchQuery.toLowerCase())
+          );
         })
-        .map(edificio => edificio.id);
+        .map((edificio) => edificio.id);
 
       // Espande gli edifici trovati
-      setExpandedEdifici(prev => [...new Set([...prev, ...edificiDaEspandere])]);
+      setExpandedEdifici((prev) => [
+        ...new Set([...prev, ...edificiDaEspandere]),
+      ]);
     }
   }, [searchQuery, edificiDettagli, incarichi]);
 
   // Carica gli incarichi dal database
   const caricaIncarichi = async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, 'incarichi'));
-      const incarichiData = querySnapshot.docs.map(doc => ({
+      const querySnapshot = await getDocs(collection(db, "incarichi"));
+      const incarichiData = querySnapshot.docs.map((doc) => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       })) as Incarico[];
       setIncarichi(incarichiData);
     } catch (error) {
-      console.error('Errore nel caricamento degli incarichi:', error);
-      setError('Errore nel caricamento degli incarichi');
+      console.error("Errore nel caricamento degli incarichi:", error);
+      setError("Errore nel caricamento degli incarichi");
     }
   };
 
   // Carica gli edifici dal database con il loro livello
   const caricaEdifici = async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, 'edifici'));
-      const edificiData = querySnapshot.docs.map(doc => ({
+      const querySnapshot = await getDocs(collection(db, "edifici"));
+      const edificiData = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       })) as EdificioConLivello[];
-      
+
       // Ordina gli edifici per livello
       edificiData.sort((a, b) => a.livello - b.livello);
       setEdificiDettagli(edificiData);
     } catch (error) {
-      console.error('Errore nel caricamento degli edifici:', error);
+      console.error("Errore nel caricamento degli edifici:", error);
     }
   };
 
   // Carica gli elementi città
   const caricaElementiCitta = async () => {
     try {
-      const elementiQuery = query(collection(db, 'elementi_citta'));
+      const elementiQuery = query(collection(db, "elementi_citta"));
       const snapshot = await getDocs(elementiQuery);
-      const elementiData = snapshot.docs.map(doc => ({
+      const elementiData = snapshot.docs.map((doc) => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       })) as ElementoCitta[];
       setElementiCitta(elementiData);
     } catch (error) {
-      console.error('Errore nel caricamento degli elementi città:', error);
-      setError('Errore nel caricamento degli elementi città');
+      console.error("Errore nel caricamento degli elementi città:", error);
+      setError("Errore nel caricamento degli elementi città");
     }
   };
 
   // Carica gli incarichi città dal database
   const caricaIncarichiCitta = async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, 'incarichi_citta'));
-      const incarichiData = querySnapshot.docs.map(doc => ({
+      const querySnapshot = await getDocs(collection(db, "incarichi_citta"));
+      const incarichiData = querySnapshot.docs.map((doc) => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       })) as IncaricoCitta[];
       setIncarichiCitta(incarichiData);
     } catch (error) {
-      console.error('Errore nel caricamento degli incarichi città:', error);
-      setError('Errore nel caricamento degli incarichi città');
+      console.error("Errore nel caricamento degli incarichi città:", error);
+      setError("Errore nel caricamento degli incarichi città");
     }
   };
 
   // Carica i derby dal database
   const caricaDerby = async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, 'derby'));
-      const derbyData = querySnapshot.docs.map(doc => ({
+      const querySnapshot = await getDocs(collection(db, "derby"));
+      const derbyData = querySnapshot.docs.map((doc) => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       })) as Derby[];
       setDerby(derbyData);
     } catch (error) {
-      console.error('Errore nel caricamento dei derby:', error);
+      console.error("Errore nel caricamento dei derby:", error);
     }
   };
 
   // Effetti per salvare le preferenze nel localStorage
   useEffect(() => {
-    localStorage.setItem("visualizzazioneLineare", String(visualizzazioneLineare));
+    localStorage.setItem(
+      "visualizzazioneLineare",
+      String(visualizzazioneLineare)
+    );
   }, [visualizzazioneLineare]);
 
   useEffect(() => {
-    localStorage.setItem("ordinamentoAlfabetico", String(ordinamentoAlfabetico));
+    localStorage.setItem(
+      "ordinamentoAlfabetico",
+      String(ordinamentoAlfabetico)
+    );
   }, [ordinamentoAlfabetico]);
 
   useEffect(() => {
-    localStorage.setItem("ordinamentoAlfabeticoInverso", String(ordinamentoAlfabeticoInverso));
+    localStorage.setItem(
+      "ordinamentoAlfabeticoInverso",
+      String(ordinamentoAlfabeticoInverso)
+    );
   }, [ordinamentoAlfabeticoInverso]);
 
   useEffect(() => {
@@ -336,23 +398,28 @@ export default function GestioneIncarichi() {
   }, [ordinamentoLivello]);
 
   useEffect(() => {
-    localStorage.setItem("ordinamentoLivelloInverso", String(ordinamentoLivelloInverso));
+    localStorage.setItem(
+      "ordinamentoLivelloInverso",
+      String(ordinamentoLivelloInverso)
+    );
   }, [ordinamentoLivelloInverso]);
 
   // Organizza gli incarichi per edificio
   const organizzaIncarichi = (incarichi: Incarico[]) => {
     const incarichiPerEdificio = new Map<string, Incarico[]>();
-    
+
     if (visualizzazioneLineare) {
       // In modalità lineare, mettiamo tutti gli incarichi in un unico gruppo
-      const tuttiIncarichi = [...incarichi].filter(inc => 
-        !searchQuery || inc.nome.toLowerCase().includes(searchQuery.toLowerCase())
+      const tuttiIncarichi = [...incarichi].filter(
+        (inc) =>
+          !searchQuery ||
+          inc.nome.toLowerCase().includes(searchQuery.toLowerCase())
       );
-      
+
       // Applica gli ordinamenti
       tuttiIncarichi.sort((a, b) => {
         if (ordinamentoAlfabetico) {
-          return ordinamentoAlfabeticoInverso 
+          return ordinamentoAlfabeticoInverso
             ? b.nome.localeCompare(a.nome)
             : a.nome.localeCompare(b.nome);
         }
@@ -364,31 +431,35 @@ export default function GestioneIncarichi() {
         }
         return a.livello_minimo - b.livello_minimo;
       });
-      
-      incarichiPerEdificio.set('tutti', tuttiIncarichi);
-    } else {
-    // Inizializza la mappa con gli edifici esistenti
-    edificiDettagli.forEach(edificio => {
-      incarichiPerEdificio.set(edificio.id, []);
-    });
 
-    // Distribuisci gli incarichi nei gruppi appropriati
-    incarichi.forEach(incarico => {
-      if (incarico.edificio_id) { 
+      incarichiPerEdificio.set("tutti", tuttiIncarichi);
+    } else {
+      // Inizializza la mappa con gli edifici esistenti
+      edificiDettagli.forEach((edificio) => {
+        incarichiPerEdificio.set(edificio.id, []);
+      });
+
+      // Distribuisci gli incarichi nei gruppi appropriati
+      incarichi.forEach((incarico) => {
+        if (incarico.edificio_id) {
           // Applica il filtro di ricerca
-          if (!searchQuery || incarico.nome.toLowerCase().includes(searchQuery.toLowerCase())) {
-        const incarichiEsistenti = incarichiPerEdificio.get(incarico.edificio_id) || [];
-        incarichiEsistenti.push(incarico);
-        incarichiPerEdificio.set(incarico.edificio_id, incarichiEsistenti);
+          if (
+            !searchQuery ||
+            incarico.nome.toLowerCase().includes(searchQuery.toLowerCase())
+          ) {
+            const incarichiEsistenti =
+              incarichiPerEdificio.get(incarico.edificio_id) || [];
+            incarichiEsistenti.push(incarico);
+            incarichiPerEdificio.set(incarico.edificio_id, incarichiEsistenti);
           }
-      }
-    });
+        }
+      });
 
       // Ordina gli incarichi all'interno di ogni gruppo
-    incarichiPerEdificio.forEach((incarichiGruppo, key) => {
+      incarichiPerEdificio.forEach((incarichiGruppo, key) => {
         incarichiGruppo.sort((a, b) => {
           if (ordinamentoAlfabetico) {
-            return ordinamentoAlfabeticoInverso 
+            return ordinamentoAlfabeticoInverso
               ? b.nome.localeCompare(a.nome)
               : a.nome.localeCompare(b.nome);
           }
@@ -418,7 +489,15 @@ export default function GestioneIncarichi() {
     if (incarichi.length > 0) {
       organizzaIncarichi(incarichi);
     }
-  }, [incarichi, edificiDettagli, visualizzazioneLineare, ordinamentoAlfabetico, ordinamentoAlfabeticoInverso, ordinamentoLivello, ordinamentoLivelloInverso]);
+  }, [
+    incarichi,
+    edificiDettagli,
+    visualizzazioneLineare,
+    ordinamentoAlfabetico,
+    ordinamentoAlfabeticoInverso,
+    ordinamentoLivello,
+    ordinamentoLivelloInverso,
+  ]);
 
   const handleAddIncarico = () => {
     setEditingIncarico(null);
@@ -437,7 +516,7 @@ export default function GestioneIncarichi() {
       edificio_id: incarico.edificio_id || null,
       is_obbligatorio: incarico.is_obbligatorio,
       usato_in_cesti: incarico.usato_in_cesti || false,
-      derby_tags: incarico.derby_tags || []
+      derby_tags: incarico.derby_tags || [],
     });
     setOpenDialog(true);
   };
@@ -451,29 +530,35 @@ export default function GestioneIncarichi() {
   const handleSave = async () => {
     try {
       if (!formData.nome) {
-        setError('Il nome è obbligatorio');
+        setError("Il nome è obbligatorio");
         return;
       }
 
       if (formData.quantita < 1) {
-        setError('La quantità deve essere maggiore di 0');
+        setError("La quantità deve essere maggiore di 0");
         return;
       }
 
       if (formData.livello_minimo < 1) {
-        setError('Il livello minimo deve essere maggiore di 0');
+        setError("Il livello minimo deve essere maggiore di 0");
         return;
       }
 
       if (!formData.edificio_id) {
-        setError('L\'edificio è obbligatorio');
+        setError("L'edificio è obbligatorio");
         return;
       }
 
       // Verifica che tutte le quantità per derby siano valide
-      for (const [derbyId, quantita] of Object.entries(formData.quantita_derby)) {
+      for (const [derbyId, quantita] of Object.entries(
+        formData.quantita_derby
+      )) {
         if (quantita < 1) {
-          setError(`La quantità per il derby ${derby.find(d => d.id === derbyId)?.nome || derbyId} deve essere maggiore di 0`);
+          setError(
+            `La quantità per il derby ${
+              derby.find((d) => d.id === derbyId)?.nome || derbyId
+            } deve essere maggiore di 0`
+          );
           return;
         }
       }
@@ -484,31 +569,39 @@ export default function GestioneIncarichi() {
       };
 
       // Salva l'incarico nel database
-      await setDoc(doc(db, 'incarichi', incaricoData.id), incaricoData);
+      await setDoc(doc(db, "incarichi", incaricoData.id), incaricoData);
 
-      setSuccess(editingIncarico ? 'Incarico aggiornato con successo!' : 'Incarico creato con successo!');
+      setSuccess(
+        editingIncarico
+          ? "Incarico aggiornato con successo!"
+          : "Incarico creato con successo!"
+      );
       handleCloseDialog();
       caricaIncarichi();
     } catch (error) {
-      console.error('Errore nel salvataggio:', error);
-      setError('Errore nel salvataggio dell\'incarico');
+      console.error("Errore nel salvataggio:", error);
+      setError("Errore nel salvataggio dell'incarico");
     }
   };
 
   const handleChange = (edificioId: string) => {
-    setExpandedEdifici(prev => {
+    setExpandedEdifici((prev) => {
       // Se c'è una ricerca attiva e l'edificio contiene risultati, non permettere la chiusura
       if (searchQuery) {
-        const incarichiEdificio = incarichi.filter(i => i.edificio_id === edificioId);
-        const haMatch = incarichiEdificio.some(i => i.nome.toLowerCase().includes(searchQuery.toLowerCase()));
+        const incarichiEdificio = incarichi.filter(
+          (i) => i.edificio_id === edificioId
+        );
+        const haMatch = incarichiEdificio.some((i) =>
+          i.nome.toLowerCase().includes(searchQuery.toLowerCase())
+        );
         if (haMatch && prev.includes(edificioId)) {
           return prev;
         }
       }
-      
+
       // Comportamento normale
       if (prev.includes(edificioId)) {
-        return prev.filter(id => id !== edificioId);
+        return prev.filter((id) => id !== edificioId);
       } else {
         return [...prev, edificioId];
       }
@@ -516,17 +609,17 @@ export default function GestioneIncarichi() {
   };
 
   const handleExpandAll = () => {
-    setTuttiEspansi(prev => {
+    setTuttiEspansi((prev) => {
       if (prev) {
         setExpandedEdifici([]);
       } else {
-        setExpandedEdifici(edificiDettagli.map(ed => ed.id));
+        setExpandedEdifici(edificiDettagli.map((ed) => ed.id));
       }
       return !prev;
     });
   };
 
-  const handleAddIncaricoCitta = (tipo: 'edificio' | 'visitatore') => {
+  const handleAddIncaricoCitta = (tipo: "edificio" | "visitatore") => {
     setTipoIncaricoCitta(tipo);
     setFormDataCitta({ ...formInizialeCitta, tipo });
     setOpenDialogCitta(true);
@@ -535,32 +628,36 @@ export default function GestioneIncarichi() {
   const handleCloseDialogCitta = () => {
     setOpenDialogCitta(false);
     setFormDataCitta({
-      nome: '',
-      descrizione: '',
-      immagine: '',
+      nome: "",
+      descrizione: "",
+      immagine: "",
       quantita: 1,
       quantita_derby: {},
       livello_minimo: 1,
       usato_in_cesti: false,
-      elemento_id: '',
+      elemento_id: "",
+      tipo: "edificio",
+      derby_tags: [],
     });
   };
 
   const handleSalvaIncaricoCitta = async () => {
     try {
       if (!formDataCitta.elemento_id) {
-        setError('Seleziona un elemento');
+        setError("Seleziona un elemento");
         return;
       }
 
       if (formDataCitta.quantita < 1) {
-        setError('La quantità deve essere maggiore di 0');
+        setError("La quantità deve essere maggiore di 0");
         return;
       }
 
-      const elemento = elementiCitta.find(e => e.id === formDataCitta.elemento_id);
+      const elemento = elementiCitta.find(
+        (e) => e.id === formDataCitta.elemento_id
+      );
       if (!elemento) {
-        setError('Elemento non trovato');
+        setError("Elemento non trovato");
         return;
       }
 
@@ -569,45 +666,54 @@ export default function GestioneIncarichi() {
         nome: elemento.nome,
         quantita: formDataCitta.quantita,
         quantita_derby: formDataCitta.quantita_derby || {},
-        livello_minimo: elemento.livello_minimo,
+        livello_minimo: elemento.livello_minimo || 1,
         elemento_id: elemento.id,
-        tipo: tipoIncaricoCitta,
-        immagine: elemento.immagine,
+        immagine: elemento.immagine || "",
         is_obbligatorio: false,
-        usato_in_cesti: formDataCitta.usato_in_cesti,
+        usato_in_cesti: formDataCitta.usato_in_cesti || false,
         data_creazione: Timestamp.now(),
-        derby_tags: formDataCitta.derby_tags || []
+        derby_tags: formDataCitta.derby_tags || [],
       };
 
+      // Aggiungiamo il tipo solo se è definito
+      if (tipoIncaricoCitta) {
+        incaricoData.tipo = tipoIncaricoCitta;
+      }
+
       if (formDataCitta.id) {
-        await updateDoc(doc(db, 'incarichi_citta', formDataCitta.id), incaricoData);
-        setSuccess('Incarico città aggiornato con successo!');
+        await updateDoc(
+          doc(db, "incarichi_citta", formDataCitta.id),
+          incaricoData as any
+        );
+        setSuccess("Incarico città aggiornato con successo!");
       } else {
-        await setDoc(doc(db, 'incarichi_citta', incaricoData.id), incaricoData);
-        setSuccess('Incarico città creato con successo!');
+        await setDoc(doc(db, "incarichi_citta", incaricoData.id), incaricoData);
+        setSuccess("Incarico città creato con successo!");
       }
 
       handleCloseDialogCitta();
       caricaIncarichiCitta();
     } catch (error) {
-      console.error('Errore nel salvataggio dell\'incarico città:', error);
-      setError('Errore nel salvataggio dell\'incarico città');
+      console.error("Errore nel salvataggio dell'incarico città:", error);
+      setError("Errore nel salvataggio dell'incarico città");
     }
   };
 
   // Funzione per eliminare un incarico città
   const handleDeleteIncaricoCitta = async (incarico: IncaricoCitta) => {
-    if (!window.confirm(`Sei sicuro di voler eliminare questo incarico città?`)) {
+    if (
+      !window.confirm(`Sei sicuro di voler eliminare questo incarico città?`)
+    ) {
       return;
     }
 
     try {
-      await deleteDoc(doc(db, 'incarichi_citta', incarico.id));
-      setSuccess('Incarico città eliminato con successo!');
+      await deleteDoc(doc(db, "incarichi_citta", incarico.id));
+      setSuccess("Incarico città eliminato con successo!");
       caricaIncarichiCitta();
     } catch (error) {
-      console.error('Errore nell\'eliminazione:', error);
-      setError('Errore nell\'eliminazione dell\'incarico città');
+      console.error("Errore nell'eliminazione:", error);
+      setError("Errore nell'eliminazione dell'incarico città");
     }
   };
 
@@ -615,60 +721,63 @@ export default function GestioneIncarichi() {
     setFormDataCitta({
       id: incarico.id,
       nome: incarico.nome,
-      descrizione: '',
-      immagine: incarico.immagine || '',
+      descrizione: "",
+      immagine: incarico.immagine || "",
       quantita: incarico.quantita,
       quantita_derby: incarico.quantita_derby || {},
       livello_minimo: incarico.livello_minimo,
-      usato_in_cesti: incarico.usato_in_cesti,
-      elemento_id: incarico.elemento_id,
-      derby_tags: incarico.derby_tags || []
+      usato_in_cesti: incarico.usato_in_cesti || false,
+      elemento_id: incarico.elemento_id || "",
+      tipo: incarico.tipo || "edificio",
+      derby_tags: incarico.derby_tags || [],
     });
-    setTipoIncaricoCitta(incarico.tipo || 'edificio');
+    setTipoIncaricoCitta(incarico.tipo || "edificio");
     setOpenDialogCitta(true);
   };
 
   // Modifica il renderIncaricoCittaCard per renderlo simile al renderIncaricoCard e rimuovo le informazioni non necessarie
   const renderIncaricoCittaCard = (incarico: IncaricoCitta) => (
-    <Box 
+    <Box
       key={incarico.id}
-      sx={{ 
-        borderBottom: '1px solid',
-        borderColor: 'divider',
-        bgcolor: 'background.paper',
-        '&:last-child': {
-          borderBottom: 'none'
-        }
+      sx={{
+        borderBottom: "1px solid",
+        borderColor: "divider",
+        bgcolor: "background.paper",
+        "&:last-child": {
+          borderBottom: "none",
+        },
       }}
     >
-      <Box sx={{ 
-        display: 'flex', 
-        alignItems: 'center',
-        position: 'relative',
-        pl: 3,
-        minHeight: 48
-      }}>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          position: "relative",
+          pl: 3,
+          minHeight: 48,
+        }}
+      >
         {/* Strisciolina del livello */}
         <Box
           sx={{
-            position: 'absolute',
+            position: "absolute",
             left: 0,
             top: 0,
             bottom: 0,
-            width: '24px',
-            bgcolor: 'rgb(33, 150, 243, 0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
+            width: "24px",
+            bgcolor: "rgb(33, 150, 243, 0.1)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
-          <Typography 
-            sx={{ 
-              fontSize: '0.75rem',
-              fontStyle: 'italic',
-              color: 'rgb(33, 150, 243)',
-              width: '3ch',
-              textAlign: 'center'
+          <Typography
+            sx={{
+              fontSize: "0.75rem",
+              fontStyle: "italic",
+              color: "rgb(33, 150, 243)",
+              width: "3ch",
+              textAlign: "center",
             }}
           >
             {incarico.livello_minimo}
@@ -676,36 +785,38 @@ export default function GestioneIncarichi() {
         </Box>
 
         {/* Contenuto principale */}
-        <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center',
-          width: '100%',
-          p: 1
-        }}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            width: "100%",
+            p: 1,
+          }}
+        >
           {/* Immagine con quantità */}
-          <Box sx={{ position: 'relative', mr: 2 }}>
+          <Box sx={{ position: "relative", mr: 2 }}>
             <Avatar
               src={incarico.immagine}
               variant="rounded"
-              sx={{ 
-                width: 32, 
-                height: 32
+              sx={{
+                width: 32,
+                height: 32,
               }}
             >
               {incarico.nome.charAt(0)}
             </Avatar>
             <Typography
               variant="caption"
-              sx={{ 
-                position: 'absolute',
+              sx={{
+                position: "absolute",
                 bottom: -8,
                 right: -8,
-                bgcolor: 'background.paper',
+                bgcolor: "background.paper",
                 border: 1,
-                borderColor: 'divider',
+                borderColor: "divider",
                 borderRadius: 1,
                 px: 0.5,
-                fontSize: '0.75rem'
+                fontSize: "0.75rem",
               }}
             >
               x{incarico.quantita}
@@ -713,51 +824,53 @@ export default function GestioneIncarichi() {
           </Box>
 
           {/* Nome e chip */}
-          <Box sx={{ 
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1,
-            flexGrow: 1
-          }}>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              flexGrow: 1,
+            }}
+          >
             <Box>
               <Typography
                 variant="body2"
-                sx={{ 
-                  wordBreak: 'break-word',
+                sx={{
+                  wordBreak: "break-word",
                   lineHeight: 1.1,
-                  fontSize: '0.875rem'
+                  fontSize: "0.875rem",
                 }}
               >
                 {incarico.nome}
               </Typography>
-              <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>
+              <Box sx={{ display: "flex", gap: 0.5, mt: 0.5 }}>
                 {incarico.usato_in_cesti && (
-                  <Chip 
-                    label="Usato in Cesti" 
+                  <Chip
+                    label="Usato in Cesti"
                     size="small"
-                    sx={{ 
+                    sx={{
                       height: 16,
-                      fontSize: '0.625rem',
-                      bgcolor: '#2196f3',
-                      color: 'white',
-                      '& .MuiChip-label': { px: 1 }
+                      fontSize: "0.625rem",
+                      bgcolor: "#2196f3",
+                      color: "white",
+                      "& .MuiChip-label": { px: 1 },
                     }}
                   />
                 )}
-                {incarico.derby_tags?.map(tagId => {
-                  const derbyInfo = derby.find(d => d.id === tagId);
+                {incarico.derby_tags?.map((tagId) => {
+                  const derbyInfo = derby.find((d) => d.id === tagId);
                   if (!derbyInfo) return null;
                   return (
-                    <Chip 
+                    <Chip
                       key={tagId}
                       label={derbyInfo.nome}
                       size="small"
-                      sx={{ 
+                      sx={{
                         height: 16,
-                        fontSize: '0.625rem',
-                        bgcolor: derbyInfo.colore || '#666',
-                        color: 'white',
-                        '& .MuiChip-label': { px: 1 }
+                        fontSize: "0.625rem",
+                        bgcolor: derbyInfo.colore || "#666",
+                        color: "white",
+                        "& .MuiChip-label": { px: 1 },
                       }}
                     />
                   );
@@ -771,11 +884,11 @@ export default function GestioneIncarichi() {
                 event.stopPropagation();
                 setAnchorEl({ id: incarico.id, element: event.currentTarget });
               }}
-              sx={{ 
-                ml: 'auto',
+              sx={{
+                ml: "auto",
                 width: 28,
                 height: 28,
-                color: 'text.secondary'
+                color: "text.secondary",
               }}
             >
               <MoreVertIcon sx={{ fontSize: 20 }} />
@@ -786,183 +899,196 @@ export default function GestioneIncarichi() {
     </Box>
   );
 
-  const renderIncaricoCard = (incarico: Incarico) => (
-    <Box 
-      key={incarico.id}
-      sx={{ 
-        borderBottom: '1px solid',
-        borderColor: 'divider',
-        bgcolor: 'background.paper',
-        '&:last-child': {
-          borderBottom: 'none'
-        }
-      }}
-    >
-      <Box sx={{ 
-        display: 'flex', 
-        alignItems: 'center',
-        position: 'relative',
-        pl: 3,
-        minHeight: 48
-      }}>
-        {/* Strisciolina del livello */}
+  const renderIncaricoCard = (incarico: Incarico) => {
+    return (
+      <Box
+        key={incarico.id}
+        sx={{
+          borderBottom: "1px solid",
+          borderColor: "divider",
+          bgcolor: "background.paper",
+          "&:last-child": {
+            borderBottom: "none",
+          },
+        }}
+      >
         <Box
           sx={{
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: '24px',
-            bgcolor: 'rgb(33, 150, 243, 0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center'
+            display: "flex",
+            alignItems: "center",
+            position: "relative",
+            pl: 3,
+            minHeight: 48,
           }}
         >
-          <Typography 
-            sx={{ 
-              fontSize: '0.75rem',
-              fontStyle: 'italic',
-              color: 'rgb(33, 150, 243)',
-              width: '3ch',
-              textAlign: 'center'
+          {/* Strisciolina del livello */}
+          <Box
+            sx={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: "24px",
+              bgcolor: "rgb(33, 150, 243, 0.1)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
-            {incarico.livello_minimo}
-          </Typography>
-        </Box>
-
-        {/* Contenuto principale */}
-        <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center',
-          width: '100%',
-          p: 1
-        }}>
-          {/* Immagine con quantità */}
-          <Box sx={{ position: 'relative', mr: 2 }}>
-            <Avatar
-              src={incarico.immagine}
-              variant="rounded"
-              sx={{ 
-                width: 32, 
-                height: 32
-              }}
-            >
-              {incarico.nome.charAt(0)}
-            </Avatar>
             <Typography
-              variant="caption"
-              sx={{ 
-                position: 'absolute',
-                bottom: -8,
-                right: -8,
-                bgcolor: 'background.paper',
-                border: 1,
-                borderColor: 'divider',
-                borderRadius: 1,
-                px: 0.5,
-                fontSize: '0.75rem'
+              sx={{
+                fontSize: "0.75rem",
+                fontStyle: "italic",
+                color: "rgb(33, 150, 243)",
+                width: "3ch",
+                textAlign: "center",
               }}
             >
-              x{incarico.quantita}
+              {incarico.livello_minimo}
             </Typography>
           </Box>
 
-          {/* Nome e chip */}
-          <Box sx={{ 
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1,
-            flexGrow: 1
-          }}>
-            <Box>
-              <Typography
-                variant="body2"
-                sx={{ 
-                  wordBreak: 'break-word',
-                  lineHeight: 1.1,
-                  fontSize: '0.875rem'
+          {/* Contenuto principale */}
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              width: "100%",
+              p: 1,
+            }}
+          >
+            {/* Immagine con quantità */}
+            <Box sx={{ position: "relative", mr: 2 }}>
+              <Avatar
+                src={incarico.immagine}
+                variant="rounded"
+                sx={{
+                  width: 32,
+                  height: 32,
                 }}
               >
-                {incarico.nome}
+                {incarico.nome.charAt(0)}
+              </Avatar>
+              <Typography
+                variant="caption"
+                sx={{
+                  position: "absolute",
+                  bottom: -8,
+                  right: -8,
+                  bgcolor: "background.paper",
+                  border: 1,
+                  borderColor: "divider",
+                  borderRadius: 1,
+                  px: 0.5,
+                  fontSize: "0.75rem",
+                }}
+              >
+                x{incarico.quantita}
               </Typography>
-              <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5, flexWrap: 'wrap' }}>
-                {incarico.is_obbligatorio && (
-                  <Chip 
-                    label="Obbligatorio" 
-                    size="small"
-                    sx={{ 
-                      height: 16,
-                      fontSize: '0.625rem',
-                      bgcolor: '#ff8c00',
-                      color: 'white',
-                      '& .MuiChip-label': { px: 1 }
-                    }}
-                  />
-                )}
-                {incarico.usato_in_cesti && (
-                  <Chip 
-                    label="Usato in Cesti" 
-                    size="small"
-                    sx={{ 
-                      height: 16,
-                      fontSize: '0.625rem',
-                      bgcolor: '#2196f3',
-                      color: 'white',
-                      '& .MuiChip-label': { px: 1 }
-                    }}
-                  />
-                )}
-                {incarico.derby_tags?.map(tagId => {
-                  const derbyInfo = derby.find(d => d.id === tagId);
-                  if (!derbyInfo) return null;
-                  return (
-                    <Chip 
-                      key={tagId}
-                      label={derbyInfo.nome}
-                      size="small"
-                      sx={{ 
-                        height: 16,
-                        fontSize: '0.625rem',
-                        bgcolor: derbyInfo.colore || '#666',
-                        color: 'white',
-                        '& .MuiChip-label': { px: 1 }
-                      }}
-                    />
-                  );
-                })}
-              </Box>
             </Box>
 
-            <IconButton
-              size="small"
-              onClick={(event) => {
-                event.stopPropagation();
-                setAnchorEl({ id: incarico.id, element: event.currentTarget });
-              }}
-              sx={{ 
-                ml: 'auto',
-                width: 28,
-                height: 28,
-                color: 'text.secondary'
+            {/* Nome e chip */}
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                flexGrow: 1,
               }}
             >
-              <MoreVertIcon sx={{ fontSize: 20 }} />
-            </IconButton>
+              <Box>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    wordBreak: "break-word",
+                    lineHeight: 1.1,
+                    fontSize: "0.875rem",
+                  }}
+                >
+                  {getTranslatedName(incarico.nome)}
+                </Typography>
+                <Box
+                  sx={{ display: "flex", gap: 0.5, mt: 0.5, flexWrap: "wrap" }}
+                >
+                  {incarico.is_obbligatorio && (
+                    <Chip
+                      label="Obbligatorio"
+                      size="small"
+                      sx={{
+                        height: 16,
+                        fontSize: "0.625rem",
+                        bgcolor: "#ff8c00",
+                        color: "white",
+                        "& .MuiChip-label": { px: 1 },
+                      }}
+                    />
+                  )}
+                  {incarico.usato_in_cesti && (
+                    <Chip
+                      label="Usato in Cesti"
+                      size="small"
+                      sx={{
+                        height: 16,
+                        fontSize: "0.625rem",
+                        bgcolor: "#2196f3",
+                        color: "white",
+                        "& .MuiChip-label": { px: 1 },
+                      }}
+                    />
+                  )}
+                  {incarico.derby_tags?.map((tagId) => {
+                    const derbyInfo = derby.find((d) => d.id === tagId);
+                    if (!derbyInfo) return null;
+                    return (
+                      <Chip
+                        key={tagId}
+                        label={derbyInfo.nome}
+                        size="small"
+                        sx={{
+                          height: 16,
+                          fontSize: "0.625rem",
+                          bgcolor: derbyInfo.colore || "#666",
+                          color: "white",
+                          "& .MuiChip-label": { px: 1 },
+                        }}
+                      />
+                    );
+                  })}
+                </Box>
+              </Box>
+
+              <IconButton
+                size="small"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setAnchorEl({
+                    id: incarico.id,
+                    element: event.currentTarget,
+                  });
+                }}
+                sx={{
+                  ml: "auto",
+                  width: 28,
+                  height: 28,
+                  color: "text.secondary",
+                }}
+              >
+                <MoreVertIcon sx={{ fontSize: 20 }} />
+              </IconButton>
+            </Box>
           </Box>
         </Box>
       </Box>
-    </Box>
-  );
+    );
+  };
 
   return (
     <Layout>
       <Box sx={{ pt: 2, px: 0 }}>
         {/* Tabs per switchare tra incarichi standard e città */}
-        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
-          <Tabs 
-            value={tabAttiva} 
+        <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
+          <Tabs
+            value={tabAttiva}
             onChange={(_, newValue: TabAttiva) => setTabAttiva(newValue)}
           >
             <Tab label="Incarichi Standard" value="standard" />
@@ -970,35 +1096,35 @@ export default function GestioneIncarichi() {
           </Tabs>
         </Box>
 
-        {tabAttiva === 'standard' ? (
+        {tabAttiva === "standard" ? (
           <>
             {/* Contatore incarichi standard */}
-            <Box 
-              sx={{ 
+            <Box
+              sx={{
                 mb: 3,
                 p: 2,
-                bgcolor: 'rgba(33, 150, 243, 0.04)',
+                bgcolor: "rgba(33, 150, 243, 0.04)",
                 borderRadius: 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
               }}
             >
-              <Typography 
-                variant="body2" 
+              <Typography
+                variant="body2"
                 color="text.secondary"
-                sx={{ 
-                  fontSize: '0.875rem',
-                  fontWeight: 500
+                sx={{
+                  fontSize: "0.875rem",
+                  fontWeight: 500,
                 }}
               >
                 TOTALE INCARICHI STANDARD:
               </Typography>
-              <Typography 
-                sx={{ 
-                  fontSize: '0.875rem',
+              <Typography
+                sx={{
+                  fontSize: "0.875rem",
                   fontWeight: 700,
-                  color: 'primary.main'
+                  color: "primary.main",
                 }}
               >
                 {incarichi.length}
@@ -1006,35 +1132,45 @@ export default function GestioneIncarichi() {
             </Box>
 
             {/* Toolbar con i pulsanti di controllo */}
-            <Box sx={{ 
-              mb: 2, 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: 1, 
-              px: 2,
-              position: 'sticky',
-              top: 0,
-              zIndex: 1,
-              bgcolor: 'background.default',
-              py: 1
-            }}>
+            <Box
+              sx={{
+                mb: 2,
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                px: 2,
+                position: "sticky",
+                top: 0,
+                zIndex: 1,
+                bgcolor: "background.default",
+                py: 1,
+              }}
+            >
               <Button
                 variant="contained"
                 size="small"
                 onClick={handleAddIncarico}
-                sx={{ 
-                  minWidth: 'auto',
+                sx={{
+                  minWidth: "auto",
                   width: 24,
                   height: 24,
-                  p: 0
+                  p: 0,
                 }}
               >
                 <AddIcon sx={{ fontSize: 16 }} />
               </Button>
 
-              <Tooltip title={visualizzazioneLineare ? "Visualizza per edificio" : "Visualizza lineare"}>
+              <Tooltip
+                title={
+                  visualizzazioneLineare
+                    ? "Visualizza per edificio"
+                    : "Visualizza lineare"
+                }
+              >
                 <IconButton
-                  onClick={() => setVisualizzazioneLineare(!visualizzazioneLineare)}
+                  onClick={() =>
+                    setVisualizzazioneLineare(!visualizzazioneLineare)
+                  }
                   color={visualizzazioneLineare ? "primary" : "default"}
                   size="small"
                 >
@@ -1042,7 +1178,15 @@ export default function GestioneIncarichi() {
                 </IconButton>
               </Tooltip>
 
-              <Tooltip title={ordinamentoAlfabetico ? (ordinamentoAlfabeticoInverso ? "Ordina dalla A alla Z" : "Ordina dalla Z alla A") : "Ordina alfabeticamente"}>
+              <Tooltip
+                title={
+                  ordinamentoAlfabetico
+                    ? ordinamentoAlfabeticoInverso
+                      ? "Ordina dalla A alla Z"
+                      : "Ordina dalla Z alla A"
+                    : "Ordina alfabeticamente"
+                }
+              >
                 <IconButton
                   onClick={() => {
                     if (!ordinamentoAlfabetico) {
@@ -1051,20 +1195,34 @@ export default function GestioneIncarichi() {
                       setOrdinamentoLivello(false);
                       setOrdinamentoLivelloInverso(false);
                     } else {
-                      setOrdinamentoAlfabeticoInverso(!ordinamentoAlfabeticoInverso);
+                      setOrdinamentoAlfabeticoInverso(
+                        !ordinamentoAlfabeticoInverso
+                      );
                     }
                   }}
                   color={ordinamentoAlfabetico ? "primary" : "default"}
                   size="small"
                 >
-                  <SortByAlphaIcon sx={{
-                    transform: ordinamentoAlfabeticoInverso ? 'rotate(180deg)' : 'none',
-                    transition: 'transform 0.2s'
-                  }} />
+                  <SortByAlphaIcon
+                    sx={{
+                      transform: ordinamentoAlfabeticoInverso
+                        ? "rotate(180deg)"
+                        : "none",
+                      transition: "transform 0.2s",
+                    }}
+                  />
                 </IconButton>
               </Tooltip>
 
-              <Tooltip title={ordinamentoLivello ? (ordinamentoLivelloInverso ? "Ordina per livello crescente" : "Ordina per livello decrescente") : "Ordina per livello"}>
+              <Tooltip
+                title={
+                  ordinamentoLivello
+                    ? ordinamentoLivelloInverso
+                      ? "Ordina per livello crescente"
+                      : "Ordina per livello decrescente"
+                    : "Ordina per livello"
+                }
+              >
                 <IconButton
                   onClick={() => {
                     if (!ordinamentoLivello) {
@@ -1077,10 +1235,14 @@ export default function GestioneIncarichi() {
                   color={ordinamentoLivello ? "primary" : "default"}
                   size="small"
                 >
-                  <SortIcon sx={{
-                    transform: ordinamentoLivelloInverso ? 'rotate(180deg)' : 'none',
-                    transition: 'transform 0.2s'
-                  }} />
+                  <SortIcon
+                    sx={{
+                      transform: ordinamentoLivelloInverso
+                        ? "rotate(180deg)"
+                        : "none",
+                      transition: "transform 0.2s",
+                    }}
+                  />
                 </IconButton>
               </Tooltip>
 
@@ -1111,378 +1273,441 @@ export default function GestioneIncarichi() {
                         <IconButton
                           size="small"
                           onClick={() => {
-                            setSearchQuery('');
+                            setSearchQuery("");
                             searchInputRef.current?.focus();
                           }}
                         >
                           <CloseIcon fontSize="small" />
                         </IconButton>
                       </InputAdornment>
-                    )
+                    ),
                   }}
                 />
               </Collapse>
             </Box>
 
             {/* Lista degli incarichi */}
-            <Box sx={{ 
-              px: 0,
-              border: 1,
-              borderColor: 'divider',
-              borderRadius: 1,
-              overflow: 'hidden'
-            }}>
-              {visualizzazioneLineare ? (
-                // Visualizzazione lineare
-                edificiConIncarichi.get('tutti')?.map((incarico) => {
-                  const edificio = edificiDettagli.find(e => e.id === incarico.edificio_id);
-                  return (
-                    <Box
-                      key={incarico.id}
-                      sx={{
-                        borderBottom: '1px solid',
-                        borderColor: 'divider',
-                        '&:last-child': {
-                          borderBottom: 'none'
-                        }
-                      }}
-                    >
-                      <Box sx={{ 
-                        display: 'flex', 
-                        alignItems: 'center',
-                        position: 'relative',
-                        pl: 3,
-                        minHeight: 48
-                      }}>
-                        {/* Strisciolina del livello */}
+            <Box
+              sx={{
+                px: 0,
+                border: 1,
+                borderColor: "divider",
+                borderRadius: 1,
+                overflow: "hidden",
+              }}
+            >
+              {visualizzazioneLineare
+                ? // Visualizzazione lineare
+                  edificiConIncarichi.get("tutti")?.map((incarico) => {
+                    const edificio = edificiDettagli.find(
+                      (e) => e.id === incarico.edificio_id
+                    );
+
+                    return (
+                      <Box
+                        key={incarico.id}
+                        sx={{
+                          borderBottom: "1px solid",
+                          borderColor: "divider",
+                          "&:last-child": {
+                            borderBottom: "none",
+                          },
+                        }}
+                      >
                         <Box
                           sx={{
-                            position: 'absolute',
-                            left: 0,
-                            top: 0,
-                            bottom: 0,
-                            width: '24px',
-                            bgcolor: 'rgb(33, 150, 243, 0.1)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
+                            display: "flex",
+                            alignItems: "center",
+                            position: "relative",
+                            pl: 3,
+                            minHeight: 48,
                           }}
                         >
-                          <Typography 
-                            sx={{ 
-                              fontSize: '0.75rem',
-                              fontStyle: 'italic',
-                              color: 'rgb(33, 150, 243)',
-                              width: '3ch',
-                              textAlign: 'center'
+                          {/* Strisciolina del livello */}
+                          <Box
+                            sx={{
+                              position: "absolute",
+                              left: 0,
+                              top: 0,
+                              bottom: 0,
+                              width: "24px",
+                              bgcolor: "rgb(33, 150, 243, 0.1)",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
                             }}
                           >
-                            {incarico.livello_minimo}
-                          </Typography>
-                        </Box>
-
-                        {/* Contenuto principale */}
-                        <Box sx={{ 
-                          display: 'flex', 
-                          alignItems: 'center',
-                          width: '100%',
-                          p: 1
-                        }}>
-                          {/* Immagine con quantità */}
-                          <Box sx={{ position: 'relative', mr: 2 }}>
-                            <Avatar
-                              src={incarico.immagine}
-                              variant="rounded"
-                              sx={{ 
-                                width: 32, 
-                                height: 32
-                              }}
-                            >
-                              {incarico.nome.charAt(0)}
-                            </Avatar>
                             <Typography
-                              variant="caption"
-                              sx={{ 
-                                position: 'absolute',
-                                bottom: -8,
-                                right: -8,
-                                bgcolor: 'background.paper',
-                                border: 1,
-                                borderColor: 'divider',
-                                borderRadius: 1,
-                                px: 0.5,
-                                fontSize: '0.75rem'
+                              sx={{
+                                fontSize: "0.75rem",
+                                fontStyle: "italic",
+                                color: "rgb(33, 150, 243)",
+                                width: "3ch",
+                                textAlign: "center",
                               }}
                             >
-                              x{incarico.quantita}
+                              {incarico.livello_minimo}
                             </Typography>
                           </Box>
 
-                          {/* Nome e chip */}
-                          <Box sx={{ 
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 1,
-                            flexGrow: 1
-                          }}>
-                            <Box>
-                              <Typography
-                                variant="body2"
-                                sx={{ 
-                                  wordBreak: 'break-word',
-                                  lineHeight: 1.1,
-                                  fontSize: '0.875rem'
+                          {/* Contenuto principale */}
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              width: "100%",
+                              p: 1,
+                            }}
+                          >
+                            {/* Immagine con quantità */}
+                            <Box sx={{ position: "relative", mr: 2 }}>
+                              <Avatar
+                                src={incarico.immagine}
+                                variant="rounded"
+                                sx={{
+                                  width: 32,
+                                  height: 32,
                                 }}
                               >
-                                {incarico.nome}
+                                {incarico.nome.charAt(0)}
+                              </Avatar>
+                              <Typography
+                                variant="caption"
+                                sx={{
+                                  position: "absolute",
+                                  bottom: -8,
+                                  right: -8,
+                                  bgcolor: "background.paper",
+                                  border: 1,
+                                  borderColor: "divider",
+                                  borderRadius: 1,
+                                  px: 0.5,
+                                  fontSize: "0.75rem",
+                                }}
+                              >
+                                x{incarico.quantita}
                               </Typography>
-                              <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5, flexWrap: 'wrap' }}>
-                                {edificio && (
-                                  <Chip 
-                                    label={edificio.nome}
-                                    size="small"
-                                    sx={{ 
-                                      height: 16,
-                                      fontSize: '0.625rem',
-                                      bgcolor: 'rgba(0, 0, 0, 0.08)',
-                                      '& .MuiChip-label': { px: 1 }
-                                    }}
-                                  />
-                                )}
-                                {incarico.is_obbligatorio && (
-                                  <Chip 
-                                    label="Obbligatorio" 
-                                    size="small"
-                                    sx={{ 
-                                      height: 16,
-                                      fontSize: '0.625rem',
-                                      bgcolor: '#ff8c00',
-                                      color: 'white',
-                                      '& .MuiChip-label': { px: 1 }
-                                    }}
-                                  />
-                                )}
-                                {incarico.usato_in_cesti && (
-                                  <Chip 
-                                    label="Usato in Cesti" 
-                                    size="small"
-                                    sx={{ 
-                                      height: 16,
-                                      fontSize: '0.625rem',
-                                      bgcolor: '#2196f3',
-                                      color: 'white',
-                                      '& .MuiChip-label': { px: 1 }
-                                    }}
-                                  />
-                                )}
-                                {incarico.derby_tags?.map(tagId => {
-                                  const derbyInfo = derby.find(d => d.id === tagId);
-                                  if (!derbyInfo) return null;
-                                  return (
-                                    <Chip 
-                                      key={tagId}
-                                      label={derbyInfo.nome}
-                                      size="small"
-                                      sx={{ 
-                                        height: 16,
-                                        fontSize: '0.625rem',
-                                        bgcolor: derbyInfo.colore || '#666',
-                                        color: 'white',
-                                        '& .MuiChip-label': { px: 1 }
-                                      }}
-                                    />
-                                  );
-                                })}
-                              </Box>
                             </Box>
 
-                            <IconButton
-                              size="small"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setAnchorEl({ id: incarico.id, element: event.currentTarget });
-                              }}
-                              sx={{ 
-                                ml: 'auto',
-                                width: 28,
-                                height: 28,
-                                color: 'text.secondary'
+                            {/* Nome e chip */}
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                                flexGrow: 1,
                               }}
                             >
-                              <MoreVertIcon sx={{ fontSize: 20 }} />
-                            </IconButton>
+                              <Box>
+                                <Typography
+                                  variant="body2"
+                                  sx={{
+                                    wordBreak: "break-word",
+                                    lineHeight: 1.1,
+                                    fontSize: "0.875rem",
+                                  }}
+                                >
+                                  {getTranslatedName(incarico.nome)}
+                                </Typography>
+                                <Box
+                                  sx={{
+                                    display: "flex",
+                                    gap: 0.5,
+                                    mt: 0.5,
+                                    flexWrap: "wrap",
+                                  }}
+                                >
+                                  {edificio && (
+                                    <Chip
+                                      label={edificio.nome}
+                                      size="small"
+                                      sx={{
+                                        height: 16,
+                                        fontSize: "0.625rem",
+                                        bgcolor: "rgba(0, 0, 0, 0.08)",
+                                        "& .MuiChip-label": { px: 1 },
+                                      }}
+                                    />
+                                  )}
+                                  {incarico.is_obbligatorio && (
+                                    <Chip
+                                      label="Obbligatorio"
+                                      size="small"
+                                      sx={{
+                                        height: 16,
+                                        fontSize: "0.625rem",
+                                        bgcolor: "#ff8c00",
+                                        color: "white",
+                                        "& .MuiChip-label": { px: 1 },
+                                      }}
+                                    />
+                                  )}
+                                  {incarico.usato_in_cesti && (
+                                    <Chip
+                                      label="Usato in Cesti"
+                                      size="small"
+                                      sx={{
+                                        height: 16,
+                                        fontSize: "0.625rem",
+                                        bgcolor: "#2196f3",
+                                        color: "white",
+                                        "& .MuiChip-label": { px: 1 },
+                                      }}
+                                    />
+                                  )}
+                                  {incarico.derby_tags?.map((tagId) => {
+                                    const derbyInfo = derby.find(
+                                      (d) => d.id === tagId
+                                    );
+                                    if (!derbyInfo) return null;
+                                    return (
+                                      <Chip
+                                        key={tagId}
+                                        label={derbyInfo.nome}
+                                        size="small"
+                                        sx={{
+                                          height: 16,
+                                          fontSize: "0.625rem",
+                                          bgcolor: derbyInfo.colore || "#666",
+                                          color: "white",
+                                          "& .MuiChip-label": { px: 1 },
+                                        }}
+                                      />
+                                    );
+                                  })}
+                                </Box>
+                              </Box>
+
+                              <IconButton
+                                size="small"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setAnchorEl({
+                                    id: incarico.id,
+                                    element: event.currentTarget,
+                                  });
+                                }}
+                                sx={{
+                                  ml: "auto",
+                                  width: 28,
+                                  height: 28,
+                                  color: "text.secondary",
+                                }}
+                              >
+                                <MoreVertIcon sx={{ fontSize: 20 }} />
+                              </IconButton>
+                            </Box>
                           </Box>
                         </Box>
                       </Box>
-                    </Box>
-                  );
-                })
-              ) : (
-                // Visualizzazione per edificio (mantieni il codice esistente)
-                edificiDettagli
-                .filter(edificio => {
-                  if (!searchQuery) return true;
-                  // Cerca nel nome dell'edificio
-                  if (edificio.nome.toLowerCase().includes(searchQuery.toLowerCase())) return true;
-                  // Cerca negli incarichi dell'edificio
-                  const incarichiEdificio = incarichi.filter(i => i.edificio_id === edificio.id);
-                  return incarichiEdificio.some(i => i.nome.toLowerCase().includes(searchQuery.toLowerCase()));
-                })
-                .map((edificio, index) => {
-                  const incarichiEdificio = edificiConIncarichi.get(edificio.id) || [];
-                  if (incarichiEdificio.length === 0) return null;
+                    );
+                  })
+                : // Visualizzazione per edificio (mantieni il codice esistente)
+                  edificiDettagli
+                    .filter((edificio) => {
+                      if (!searchQuery) return true;
+                      // Cerca nel nome dell'edificio
+                      if (
+                        edificio.nome
+                          .toLowerCase()
+                          .includes(searchQuery.toLowerCase())
+                      )
+                        return true;
+                      // Cerca negli incarichi dell'edificio
+                      const incarichiEdificio = incarichi.filter(
+                        (i) => i.edificio_id === edificio.id
+                      );
+                      return incarichiEdificio.some((i) =>
+                        i.nome.toLowerCase().includes(searchQuery.toLowerCase())
+                      );
+                    })
+                    .map((edificio, index) => {
+                      const incarichiEdificio =
+                        edificiConIncarichi.get(edificio.id) || [];
+                      if (incarichiEdificio.length === 0) return null;
 
-                  // Filtra gli incarichi in base alla ricerca
-                  const incarichiMostrati = searchQuery
-                    ? incarichiEdificio.filter(i => i.nome.toLowerCase().includes(searchQuery.toLowerCase()))
-                    : incarichiEdificio;
+                      // Filtra gli incarichi in base alla ricerca
+                      const incarichiMostrati = searchQuery
+                        ? incarichiEdificio.filter((i) =>
+                            i.nome
+                              .toLowerCase()
+                              .includes(searchQuery.toLowerCase())
+                          )
+                        : incarichiEdificio;
 
-                  if (incarichiMostrati.length === 0) return null;
+                      if (incarichiMostrati.length === 0) return null;
 
-                  return (
-                    <Accordion 
-                      key={edificio.id}
-                      expanded={expandedEdifici.includes(edificio.id)}
-                      onChange={() => handleChange(edificio.id)}
-                      sx={{ 
-                        '&:before': {
-                          display: 'none',
-                        },
-                        boxShadow: 'none',
-                        borderRadius: 0,
-                        borderBottom: index !== edificiDettagli.length - 1 ? '1px solid' : 'none',
-                        borderColor: 'divider',
-                        '&:first-of-type': {
-                          borderTop: 'none',
-                        },
-                        '&:not(:first-of-type):before': {
-                          display: 'none',
-                        },
-                        '& .MuiAccordionSummary-root': {
-                          minHeight: 56,
-                          bgcolor: 'rgba(0, 0, 0, 0.02)',
-                        }
-                      }}
-                    >
-                      <AccordionSummary 
-                        expandIcon={<ExpandMoreIcon />}
-                        sx={{
-                          '& .MuiAccordionSummary-content': {
-                            m: 0
-                          }
-                        }}
-                      >
-                        <Box sx={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: 2,
-                          width: '100%'
-                        }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <Avatar 
-                              src={edificio.immagine} 
-                              variant="rounded"
-                              sx={{ width: 40, height: 40 }}
-                            >
-                              {edificio.nome.charAt(0)}
-                            </Avatar>
-                          </Box>
-                          <Box sx={{ 
-                            display: 'flex', 
-                            alignItems: 'center', 
-                            justifyContent: 'space-between',
-                            width: '100%'
-                          }}>
-                            <Box>
-                              <Typography 
-                                sx={{ 
-                                  fontSize: '0.95rem',
-                                  fontWeight: 500,
-                                  lineHeight: 1.2
-                                }}
-                              >
-                                {edificio.nome}
-                              </Typography>
-                              <Typography 
-                                variant="caption" 
-                                sx={{ 
-                                  color: 'primary.main',
-                                  fontStyle: 'italic',
-                                  fontSize: '0.75rem'
-                                }}
-                              >
-                                Liv. {edificio.livello}
-                              </Typography>
-                            </Box>
-                            <Typography 
-                              variant="caption" 
-                              color="text.secondary"
-                              sx={{ 
-                                ml: 'auto',
-                                fontSize: '0.75rem'
+                      return (
+                        <Accordion
+                          key={edificio.id}
+                          expanded={expandedEdifici.includes(edificio.id)}
+                          onChange={() => handleChange(edificio.id)}
+                          sx={{
+                            "&:before": {
+                              display: "none",
+                            },
+                            boxShadow: "none",
+                            borderRadius: 0,
+                            borderBottom:
+                              index !== edificiDettagli.length - 1
+                                ? "1px solid"
+                                : "none",
+                            borderColor: "divider",
+                            "&:first-of-type": {
+                              borderTop: "none",
+                            },
+                            "&:not(:first-of-type):before": {
+                              display: "none",
+                            },
+                            "& .MuiAccordionSummary-root": {
+                              minHeight: 56,
+                              bgcolor: "rgba(0, 0, 0, 0.02)",
+                            },
+                          }}
+                        >
+                          <AccordionSummary
+                            expandIcon={<ExpandMoreIcon />}
+                            sx={{
+                              "& .MuiAccordionSummary-content": {
+                                m: 0,
+                              },
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 2,
+                                width: "100%",
                               }}
                             >
-                              {incarichiEdificio.length} {incarichiEdificio.length === 1 ? 'incarico' : 'incarichi'}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      </AccordionSummary>
-                      <AccordionDetails sx={{ p: 0 }}>
-                        <Box sx={{ 
-                          borderTop: 1, 
-                          borderColor: 'divider',
-                          bgcolor: 'background.paper'
-                        }}>
-                          {incarichiMostrati.map(renderIncaricoCard)}
-                        </Box>
-                      </AccordionDetails>
-                    </Accordion>
-                  );
-                  })
-              )}
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 2,
+                                }}
+                              >
+                                <Avatar
+                                  src={edificio.immagine}
+                                  variant="rounded"
+                                  sx={{ width: 40, height: 40 }}
+                                >
+                                  {edificio.nome.charAt(0)}
+                                </Avatar>
+                              </Box>
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  width: "100%",
+                                }}
+                              >
+                                <Box>
+                                  <Typography
+                                    sx={{
+                                      fontSize: "0.95rem",
+                                      fontWeight: 500,
+                                      lineHeight: 1.2,
+                                    }}
+                                  >
+                                    {edificio.nome}
+                                  </Typography>
+                                  <Typography
+                                    variant="caption"
+                                    sx={{
+                                      color: "primary.main",
+                                      fontStyle: "italic",
+                                      fontSize: "0.75rem",
+                                    }}
+                                  >
+                                    Liv. {edificio.livello}
+                                  </Typography>
+                                </Box>
+                                <Typography
+                                  variant="caption"
+                                  color="text.secondary"
+                                  sx={{
+                                    ml: "auto",
+                                    fontSize: "0.75rem",
+                                  }}
+                                >
+                                  {incarichiEdificio.length}{" "}
+                                  {incarichiEdificio.length === 1
+                                    ? "incarico"
+                                    : "incarichi"}
+                                </Typography>
+                              </Box>
+                            </Box>
+                          </AccordionSummary>
+                          <AccordionDetails sx={{ p: 0 }}>
+                            <Box
+                              sx={{
+                                borderTop: 1,
+                                borderColor: "divider",
+                                bgcolor: "background.paper",
+                              }}
+                            >
+                              {incarichiMostrati.map(renderIncaricoCard)}
+                            </Box>
+                          </AccordionDetails>
+                        </Accordion>
+                      );
+                    })}
             </Box>
           </>
         ) : (
           <>
             {/* Contatore incarichi città */}
-            <Box 
-              sx={{ 
+            <Box
+              sx={{
                 mb: 3,
                 p: 2,
-                bgcolor: 'rgba(33, 150, 243, 0.04)',
+                bgcolor: "rgba(33, 150, 243, 0.04)",
                 borderRadius: 1,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
               }}
             >
-              <Typography 
-                variant="body2" 
+              <Typography
+                variant="body2"
                 color="text.secondary"
-                sx={{ 
-                  fontSize: '0.875rem',
-                  fontWeight: 500
+                sx={{
+                  fontSize: "0.875rem",
+                  fontWeight: 500,
                 }}
               >
                 TOTALE INCARICHI CITTÀ:
               </Typography>
-              <Typography 
-                sx={{ 
-                  fontSize: '0.875rem',
+              <Typography
+                sx={{
+                  fontSize: "0.875rem",
                   fontWeight: 700,
-                  color: 'primary.main'
+                  color: "primary.main",
                 }}
               >
                 {incarichiCitta.length}
               </Typography>
             </Box>
 
-            <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1, px: 2 }}>
+            <Box
+              sx={{
+                mb: 2,
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                px: 2,
+              }}
+            >
               <IconButton
                 onClick={() => {
                   const nuovoStato = !tuttiEspansi;
                   setTuttiEspansi(nuovoStato);
-                  setExpandedEdifici(nuovoStato ? ['edifici_citta', 'visitatori_citta'] : []);
+                  setExpandedEdifici(
+                    nuovoStato ? ["edifici_citta", "visitatori_citta"] : []
+                  );
                 }}
                 size="small"
               >
@@ -1491,186 +1716,205 @@ export default function GestioneIncarichi() {
             </Box>
 
             {/* Lista incarichi città */}
-            <Box sx={{ 
-              px: 0,
-              border: 1,
-              borderColor: 'divider',
-              borderRadius: 1,
-              overflow: 'hidden'
-            }}>
+            <Box
+              sx={{
+                px: 0,
+                border: 1,
+                borderColor: "divider",
+                borderRadius: 1,
+                overflow: "hidden",
+              }}
+            >
               {/* Sezione Edifici */}
-              <Accordion 
-                expanded={expandedEdifici.includes('edifici_citta')}
-                onChange={() => handleChange('edifici_citta')}
-                sx={{ 
-                  '&:before': {
-                    display: 'none',
+              <Accordion
+                expanded={expandedEdifici.includes("edifici_citta")}
+                onChange={() => handleChange("edifici_citta")}
+                sx={{
+                  "&:before": {
+                    display: "none",
                   },
-                  boxShadow: 'none',
+                  boxShadow: "none",
                   borderRadius: 0,
-                  borderBottom: '1px solid',
-                  borderColor: 'divider',
-                  '&:first-of-type': {
-                    borderTop: 'none',
+                  borderBottom: "1px solid",
+                  borderColor: "divider",
+                  "&:first-of-type": {
+                    borderTop: "none",
                   },
-                  '&:not(:first-of-type):before': {
-                    display: 'none',
+                  "&:not(:first-of-type):before": {
+                    display: "none",
                   },
-                  '& .MuiAccordionSummary-root': {
+                  "& .MuiAccordionSummary-root": {
                     minHeight: 56,
-                    bgcolor: 'rgba(0, 0, 0, 0.02)',
-                  }
+                    bgcolor: "rgba(0, 0, 0, 0.02)",
+                  },
                 }}
               >
-                <AccordionSummary 
+                <AccordionSummary
                   expandIcon={<ExpandMoreIcon />}
                   sx={{
-                    '& .MuiAccordionSummary-content': {
-                      m: 0
-                    }
+                    "& .MuiAccordionSummary-content": {
+                      m: 0,
+                    },
                   }}
                 >
-                  <Box sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: 2,
-                    width: '100%'
-                  }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 2,
+                      width: "100%",
+                    }}
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                       <Button
                         variant="contained"
                         size="small"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleAddIncaricoCitta('edificio');
+                          handleAddIncaricoCitta("edificio");
                         }}
-                        sx={{ 
-                          minWidth: 'auto',
+                        sx={{
+                          minWidth: "auto",
                           width: 24,
                           height: 24,
-                          p: 0
+                          p: 0,
                         }}
                       >
                         <AddIcon sx={{ fontSize: 16 }} />
                       </Button>
-                      <Typography 
-                        sx={{ 
-                          fontSize: '0.95rem',
+                      <Typography
+                        sx={{
+                          fontSize: "0.95rem",
                           fontWeight: 500,
-                          lineHeight: 1.2
+                          lineHeight: 1.2,
                         }}
                       >
                         Edifici
                       </Typography>
                     </Box>
-                    <Typography 
-                      variant="caption" 
+                    <Typography
+                      variant="caption"
                       color="text.secondary"
-                      sx={{ 
-                        ml: 'auto',
-                        fontSize: '0.75rem'
+                      sx={{
+                        ml: "auto",
+                        fontSize: "0.75rem",
                       }}
                     >
-                      {incarichiCitta.filter(inc => inc.tipo === 'edificio').length} incarichi
+                      {
+                        incarichiCitta.filter((inc) => inc.tipo === "edificio")
+                          .length
+                      }{" "}
+                      incarichi
                     </Typography>
                   </Box>
                 </AccordionSummary>
                 <AccordionDetails sx={{ p: 0 }}>
-                  <Box sx={{ 
-                    borderTop: 1, 
-                    borderColor: 'divider',
-                    bgcolor: 'background.paper'
-                  }}>
+                  <Box
+                    sx={{
+                      borderTop: 1,
+                      borderColor: "divider",
+                      bgcolor: "background.paper",
+                    }}
+                  >
                     {incarichiCitta
-                      .filter(inc => inc.tipo === 'edificio')
+                      .filter((inc) => inc.tipo === "edificio")
                       .map(renderIncaricoCittaCard)}
                   </Box>
                 </AccordionDetails>
               </Accordion>
 
               {/* Sezione Visitatori */}
-              <Accordion 
-                expanded={expandedEdifici.includes('visitatori_citta')}
-                onChange={() => handleChange('visitatori_citta')}
-                sx={{ 
-                  '&:before': {
-                    display: 'none',
+              <Accordion
+                expanded={expandedEdifici.includes("visitatori_citta")}
+                onChange={() => handleChange("visitatori_citta")}
+                sx={{
+                  "&:before": {
+                    display: "none",
                   },
-                  boxShadow: 'none',
+                  boxShadow: "none",
                   borderRadius: 0,
-                  '&:first-of-type': {
-                    borderTop: 'none',
+                  "&:first-of-type": {
+                    borderTop: "none",
                   },
-                  '&:not(:first-of-type):before': {
-                    display: 'none',
+                  "&:not(:first-of-type):before": {
+                    display: "none",
                   },
-                  '& .MuiAccordionSummary-root': {
+                  "& .MuiAccordionSummary-root": {
                     minHeight: 56,
-                    bgcolor: 'rgba(0, 0, 0, 0.02)',
-                  }
+                    bgcolor: "rgba(0, 0, 0, 0.02)",
+                  },
                 }}
               >
-                <AccordionSummary 
+                <AccordionSummary
                   expandIcon={<ExpandMoreIcon />}
                   sx={{
-                    '& .MuiAccordionSummary-content': {
-                      m: 0
-                    }
+                    "& .MuiAccordionSummary-content": {
+                      m: 0,
+                    },
                   }}
                 >
-                  <Box sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: 2,
-                    width: '100%'
-                  }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 2,
+                      width: "100%",
+                    }}
+                  >
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                       <Button
                         variant="contained"
                         size="small"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleAddIncaricoCitta('visitatore');
+                          handleAddIncaricoCitta("visitatore");
                         }}
-                        sx={{ 
-                          minWidth: 'auto',
+                        sx={{
+                          minWidth: "auto",
                           width: 24,
                           height: 24,
-                          p: 0
+                          p: 0,
                         }}
                       >
                         <AddIcon sx={{ fontSize: 16 }} />
                       </Button>
-                      <Typography 
-                        sx={{ 
-                          fontSize: '0.95rem',
+                      <Typography
+                        sx={{
+                          fontSize: "0.95rem",
                           fontWeight: 500,
-                          lineHeight: 1.2
+                          lineHeight: 1.2,
                         }}
                       >
                         Visitatori
                       </Typography>
                     </Box>
-                    <Typography 
-                      variant="caption" 
+                    <Typography
+                      variant="caption"
                       color="text.secondary"
-                      sx={{ 
-                        ml: 'auto',
-                        fontSize: '0.75rem'
+                      sx={{
+                        ml: "auto",
+                        fontSize: "0.75rem",
                       }}
                     >
-                      {incarichiCitta.filter(inc => inc.tipo === 'visitatore').length} incarichi
+                      {
+                        incarichiCitta.filter(
+                          (inc) => inc.tipo === "visitatore"
+                        ).length
+                      }{" "}
+                      incarichi
                     </Typography>
                   </Box>
                 </AccordionSummary>
                 <AccordionDetails sx={{ p: 0 }}>
-                  <Box sx={{ 
-                    borderTop: 1, 
-                    borderColor: 'divider',
-                    bgcolor: 'background.paper'
-                  }}>
+                  <Box
+                    sx={{
+                      borderTop: 1,
+                      borderColor: "divider",
+                      bgcolor: "background.paper",
+                    }}
+                  >
                     {incarichiCitta
-                      .filter(inc => inc.tipo === 'visitatore')
+                      .filter((inc) => inc.tipo === "visitatore")
                       .map(renderIncaricoCittaCard)}
                   </Box>
                 </AccordionDetails>
@@ -1679,9 +1923,14 @@ export default function GestioneIncarichi() {
           </>
         )}
 
-        <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
+        <Dialog
+          open={openDialog}
+          onClose={handleCloseDialog}
+          maxWidth="md"
+          fullWidth
+        >
           <DialogTitle>
-            {editingIncarico ? 'Modifica Incarico' : 'Nuovo Incarico'}
+            {editingIncarico ? "Modifica Incarico" : "Nuovo Incarico"}
           </DialogTitle>
           <DialogContent>
             <Grid container spacing={2} sx={{ mt: 1 }}>
@@ -1690,7 +1939,9 @@ export default function GestioneIncarichi() {
                   fullWidth
                   label="Nome Incarico"
                   value={formData.nome}
-                  onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, nome: e.target.value })
+                  }
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -1698,9 +1949,11 @@ export default function GestioneIncarichi() {
                   fullWidth
                   type="number"
                   label="Livello Minimo"
-                  value={formData.livello_minimo === 0 ? '' : formData.livello_minimo}
+                  value={
+                    formData.livello_minimo === 0 ? "" : formData.livello_minimo
+                  }
                   onChange={(e) => {
-                    if (e.target.value === '') {
+                    if (e.target.value === "") {
                       setFormData({ ...formData, livello_minimo: 0 });
                     } else {
                       const value = parseInt(e.target.value);
@@ -1709,21 +1962,21 @@ export default function GestioneIncarichi() {
                       }
                     }
                   }}
-                  InputProps={{ 
+                  InputProps={{
                     inputProps: { min: 1 },
                     startAdornment: (
                       <InputAdornment position="start">
-                        <img 
-                          src="/images/livello.png" 
-                          alt="Livello" 
-                          style={{ 
-                            width: '16px', 
-                            height: '16px',
-                            marginRight: '4px'
-                          }} 
+                        <img
+                          src="/images/livello.png"
+                          alt="Livello"
+                          style={{
+                            width: "16px",
+                            height: "16px",
+                            marginRight: "4px",
+                          }}
                         />
                       </InputAdornment>
-                    )
+                    ),
                   }}
                 />
               </Grid>
@@ -1732,9 +1985,9 @@ export default function GestioneIncarichi() {
                   fullWidth
                   type="number"
                   label="Quantità Default"
-                  value={formData.quantita === 0 ? '' : formData.quantita}
+                  value={formData.quantita === 0 ? "" : formData.quantita}
                   onChange={(e) => {
-                    if (e.target.value === '') {
+                    if (e.target.value === "") {
                       setFormData({ ...formData, quantita: 0 });
                     } else {
                       const value = parseInt(e.target.value);
@@ -1753,15 +2006,17 @@ export default function GestioneIncarichi() {
                   <AccordionSummary
                     expandIcon={<ExpandMoreIcon />}
                     sx={{
-                      backgroundColor: 'rgba(0, 0, 0, 0.03)',
-                      borderRadius: '4px',
-                      '&.Mui-expanded': {
+                      backgroundColor: "rgba(0, 0, 0, 0.03)",
+                      borderRadius: "4px",
+                      "&.Mui-expanded": {
                         borderBottomLeftRadius: 0,
                         borderBottomRightRadius: 0,
-                      }
+                      },
                     }}
                   >
-                    <Typography variant="subtitle1">Quantità per Derby</Typography>
+                    <Typography variant="subtitle1">
+                      Quantità per Derby
+                    </Typography>
                   </AccordionSummary>
                   <AccordionDetails>
                     <Grid container spacing={2}>
@@ -1771,15 +2026,20 @@ export default function GestioneIncarichi() {
                             fullWidth
                             type="number"
                             label={`Quantità per ${d.nome}`}
-                            value={formData.quantita_derby[d.id] === 0 ? '' : (formData.quantita_derby[d.id] || formData.quantita)}
+                            value={
+                              formData.quantita_derby[d.id] === 0
+                                ? ""
+                                : formData.quantita_derby[d.id] ||
+                                  formData.quantita
+                            }
                             onChange={(e) => {
-                              if (e.target.value === '') {
+                              if (e.target.value === "") {
                                 setFormData({
                                   ...formData,
                                   quantita_derby: {
                                     ...formData.quantita_derby,
-                                    [d.id]: 0
-                                  }
+                                    [d.id]: 0,
+                                  },
                                 });
                               } else {
                                 const value = parseInt(e.target.value);
@@ -1788,8 +2048,8 @@ export default function GestioneIncarichi() {
                                     ...formData,
                                     quantita_derby: {
                                       ...formData.quantita_derby,
-                                      [d.id]: value
-                                    }
+                                      [d.id]: value,
+                                    },
                                   });
                                 }
                               }
@@ -1807,8 +2067,13 @@ export default function GestioneIncarichi() {
                 <FormControl fullWidth required sx={{ mt: 2 }}>
                   <InputLabel>Edificio</InputLabel>
                   <Select
-                    value={formData.edificio_id || ''}
-                    onChange={(e) => setFormData({ ...formData, edificio_id: e.target.value as string | null })}
+                    value={formData.edificio_id || ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        edificio_id: e.target.value as string | null,
+                      })
+                    }
                     label="Edificio"
                     required
                   >
@@ -1825,7 +2090,12 @@ export default function GestioneIncarichi() {
                   control={
                     <Switch
                       checked={formData.is_obbligatorio}
-                      onChange={(e) => setFormData({ ...formData, is_obbligatorio: e.target.checked })}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          is_obbligatorio: e.target.checked,
+                        })
+                      }
                     />
                   }
                   label="Incarico Obbligatorio"
@@ -1836,20 +2106,31 @@ export default function GestioneIncarichi() {
                   control={
                     <Switch
                       checked={formData.usato_in_cesti}
-                      onChange={(e) => setFormData({ ...formData, usato_in_cesti: e.target.checked })}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          usato_in_cesti: e.target.checked,
+                        })
+                      }
                     />
                   }
                   label="Usato nei Cesti"
                 />
               </Grid>
               <Grid item xs={12}>
-                <Typography variant="subtitle2" gutterBottom>Icona</Typography>
+                <Typography variant="subtitle2" gutterBottom>
+                  Icona
+                </Typography>
                 <UploadImmagine
                   cartella="incarichi"
-                  id={editingIncarico?.id || 'nuovo'}
+                  id={editingIncarico?.id || "nuovo"}
                   urlImmagine={formData.immagine}
-                  onImmagineCaricata={(url) => setFormData({ ...formData, immagine: url })}
-                  onImmagineEliminata={() => setFormData({ ...formData, immagine: '' })}
+                  onImmagineCaricata={(url) =>
+                    setFormData({ ...formData, immagine: url })
+                  }
+                  onImmagineEliminata={() =>
+                    setFormData({ ...formData, immagine: "" })
+                  }
                   dimensione={100}
                 />
               </Grid>
@@ -1865,17 +2146,17 @@ export default function GestioneIncarichi() {
                     }}
                     input={<OutlinedInput label="Derby Tags" />}
                     renderValue={(selected) => (
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
                         {selected.map((value) => {
-                          const derbyInfo = derby.find(d => d.id === value);
+                          const derbyInfo = derby.find((d) => d.id === value);
                           return (
                             <Chip
                               key={value}
                               label={derbyInfo?.nome}
                               size="small"
-                              sx={{ 
-                                bgcolor: derbyInfo?.colore || '#666',
-                                color: 'white'
+                              sx={{
+                                bgcolor: derbyInfo?.colore || "#666",
+                                color: "white",
                               }}
                             />
                           );
@@ -1885,16 +2166,18 @@ export default function GestioneIncarichi() {
                   >
                     {derby.map((d) => (
                       <MenuItem key={d.id} value={d.id}>
-                        <Checkbox checked={formData.derby_tags.indexOf(d.id) > -1} />
+                        <Checkbox
+                          checked={formData.derby_tags.indexOf(d.id) > -1}
+                        />
                         <Box
                           component="span"
                           sx={{
                             width: 14,
                             height: 14,
                             mr: 1,
-                            borderRadius: '50%',
-                            display: 'inline-block',
-                            bgcolor: d.colore || '#666'
+                            borderRadius: "50%",
+                            display: "inline-block",
+                            bgcolor: d.colore || "#666",
                           }}
                         />
                         {d.nome}
@@ -1913,30 +2196,41 @@ export default function GestioneIncarichi() {
           </DialogActions>
         </Dialog>
 
-        <Dialog open={openDialogCitta} onClose={handleCloseDialogCitta} maxWidth="sm" fullWidth>
+        <Dialog
+          open={openDialogCitta}
+          onClose={handleCloseDialogCitta}
+          maxWidth="sm"
+          fullWidth
+        >
           <DialogTitle>
-            Nuovo Incarico {tipoIncaricoCitta === 'edificio' ? 'Edificio' : 'Visitatore'} Città
+            Nuovo Incarico{" "}
+            {tipoIncaricoCitta === "edificio" ? "Edificio" : "Visitatore"} Città
           </DialogTitle>
           <DialogContent>
-            <Box sx={{ pt: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Box
+              sx={{ pt: 2, display: "flex", flexDirection: "column", gap: 2 }}
+            >
               <FormControl fullWidth size="small">
                 <InputLabel>
-                  Seleziona {tipoIncaricoCitta === 'edificio' ? 'Edificio' : 'Visitatore'}
+                  Seleziona{" "}
+                  {tipoIncaricoCitta === "edificio" ? "Edificio" : "Visitatore"}
                 </InputLabel>
                 <Select
                   value={formDataCitta.elemento_id}
                   onChange={(e) => {
-                    const elementoSelezionato = elementiCitta.find(el => el.id === e.target.value);
-                    setFormDataCitta({ 
-                      ...formDataCitta, 
+                    const elementoSelezionato = elementiCitta.find(
+                      (el) => el.id === e.target.value
+                    );
+                    setFormDataCitta({
+                      ...formDataCitta,
                       elemento_id: e.target.value,
-                      livello_minimo: elementoSelezionato?.livello_minimo || 1
+                      livello_minimo: elementoSelezionato?.livello_minimo || 1,
                     });
                   }}
                 >
                   {elementiCitta
-                    .filter(e => e.tipo === tipoIncaricoCitta)
-                    .map(elemento => (
+                    .filter((e) => e.tipo === tipoIncaricoCitta)
+                    .map((elemento) => (
                       <MenuItem key={elemento.id} value={elemento.id}>
                         {elemento.nome} (Liv. {elemento.livello_minimo})
                       </MenuItem>
@@ -1950,14 +2244,19 @@ export default function GestioneIncarichi() {
                     fullWidth
                     type="number"
                     label="Quantità"
-                    value={formDataCitta.quantita === 0 ? '' : formDataCitta.quantita}
+                    value={
+                      formDataCitta.quantita === 0 ? "" : formDataCitta.quantita
+                    }
                     onChange={(e) => {
-                      if (e.target.value === '') {
+                      if (e.target.value === "") {
                         setFormDataCitta({ ...formDataCitta, quantita: 0 });
                       } else {
                         const value = parseInt(e.target.value);
                         if (!isNaN(value) && value >= 0) {
-                          setFormDataCitta({ ...formDataCitta, quantita: value });
+                          setFormDataCitta({
+                            ...formDataCitta,
+                            quantita: value,
+                          });
                         }
                       }
                     }}
@@ -1970,14 +2269,24 @@ export default function GestioneIncarichi() {
                     fullWidth
                     type="number"
                     label="Livello Minimo"
-                    value={formDataCitta.livello_minimo === 0 ? '' : formDataCitta.livello_minimo}
+                    value={
+                      formDataCitta.livello_minimo === 0
+                        ? ""
+                        : formDataCitta.livello_minimo
+                    }
                     onChange={(e) => {
-                      if (e.target.value === '') {
-                        setFormDataCitta({ ...formDataCitta, livello_minimo: 0 });
+                      if (e.target.value === "") {
+                        setFormDataCitta({
+                          ...formDataCitta,
+                          livello_minimo: 0,
+                        });
                       } else {
                         const value = parseInt(e.target.value);
                         if (!isNaN(value) && value >= 0) {
-                          setFormDataCitta({ ...formDataCitta, livello_minimo: value });
+                          setFormDataCitta({
+                            ...formDataCitta,
+                            livello_minimo: value,
+                          });
                         }
                       }
                     }}
@@ -1989,7 +2298,9 @@ export default function GestioneIncarichi() {
 
               {/* Quantità per Derby */}
               <Grid item xs={12}>
-                <Typography variant="subtitle1" sx={{ mb: 1 }}>Quantità per Derby</Typography>
+                <Typography variant="subtitle1" sx={{ mb: 1 }}>
+                  Quantità per Derby
+                </Typography>
                 <Grid container spacing={2}>
                   {derby.map((d) => (
                     <Grid item xs={12} sm={6} key={d.id}>
@@ -1997,15 +2308,20 @@ export default function GestioneIncarichi() {
                         fullWidth
                         type="number"
                         label={`Quantità per ${d.nome}`}
-                        value={formDataCitta.quantita_derby?.[d.id] === 0 ? '' : (formDataCitta.quantita_derby?.[d.id] || formDataCitta.quantita)}
+                        value={
+                          formDataCitta.quantita_derby?.[d.id] === 0
+                            ? ""
+                            : formDataCitta.quantita_derby?.[d.id] ||
+                              formDataCitta.quantita
+                        }
                         onChange={(e) => {
-                          if (e.target.value === '') {
+                          if (e.target.value === "") {
                             setFormDataCitta({
                               ...formDataCitta,
                               quantita_derby: {
                                 ...formDataCitta.quantita_derby,
-                                [d.id]: 0
-                              }
+                                [d.id]: 0,
+                              },
                             });
                           } else {
                             const value = parseInt(e.target.value);
@@ -2014,8 +2330,8 @@ export default function GestioneIncarichi() {
                                 ...formDataCitta,
                                 quantita_derby: {
                                   ...formDataCitta.quantita_derby,
-                                  [d.id]: value
-                                }
+                                  [d.id]: value,
+                                },
                               });
                             }
                           }
@@ -2034,10 +2350,12 @@ export default function GestioneIncarichi() {
                   control={
                     <Switch
                       checked={formDataCitta.usato_in_cesti || false}
-                      onChange={(e) => setFormDataCitta({
-                        ...formDataCitta,
-                        usato_in_cesti: e.target.checked
-                      })}
+                      onChange={(e) =>
+                        setFormDataCitta({
+                          ...formDataCitta,
+                          usato_in_cesti: e.target.checked,
+                        })
+                      }
                     />
                   }
                   label="Usato nei Cesti"
@@ -2055,22 +2373,22 @@ export default function GestioneIncarichi() {
                       const value = e.target.value as string[];
                       setFormDataCitta({
                         ...formDataCitta,
-                        derby_tags: value
+                        derby_tags: value,
                       });
                     }}
                     input={<OutlinedInput label="Derby Tags" />}
                     renderValue={(selected) => (
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                      <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
                         {selected.map((value) => {
-                          const derbyInfo = derby.find(d => d.id === value);
+                          const derbyInfo = derby.find((d) => d.id === value);
                           return (
                             <Chip
                               key={value}
                               label={derbyInfo?.nome}
                               size="small"
-                              sx={{ 
-                                bgcolor: derbyInfo?.colore || '#666',
-                                color: 'white'
+                              sx={{
+                                bgcolor: derbyInfo?.colore || "#666",
+                                color: "white",
                               }}
                             />
                           );
@@ -2080,16 +2398,20 @@ export default function GestioneIncarichi() {
                   >
                     {derby.map((d) => (
                       <MenuItem key={d.id} value={d.id}>
-                        <Checkbox checked={(formDataCitta.derby_tags || []).indexOf(d.id) > -1} />
+                        <Checkbox
+                          checked={
+                            (formDataCitta.derby_tags || []).indexOf(d.id) > -1
+                          }
+                        />
                         <Box
                           component="span"
                           sx={{
                             width: 14,
                             height: 14,
                             mr: 1,
-                            borderRadius: '50%',
-                            display: 'inline-block',
-                            bgcolor: d.colore || '#666'
+                            borderRadius: "50%",
+                            display: "inline-block",
+                            bgcolor: d.colore || "#666",
                           }}
                         />
                         {d.nome}
@@ -2112,16 +2434,16 @@ export default function GestioneIncarichi() {
           open={!!error || !!success}
           autoHideDuration={6000}
           onClose={() => {
-            setError('');
-            setSuccess('');
+            setError("");
+            setSuccess("");
           }}
         >
           <Alert
             onClose={() => {
-              setError('');
-              setSuccess('');
+              setError("");
+              setSuccess("");
             }}
-            severity={error ? 'error' : 'success'}
+            severity={error ? "error" : "success"}
           >
             {error || success}
           </Alert>
@@ -2133,52 +2455,67 @@ export default function GestioneIncarichi() {
           open={Boolean(anchorEl)}
           onClose={() => setAnchorEl(null)}
         >
-          <MenuItem onClick={() => {
-            if (anchorEl) {
-              // Cerca prima negli incarichi standard
-              const incaricoStandard = incarichi.find(i => i.id === anchorEl.id);
-              if (incaricoStandard) {
-                handleEditIncarico(incaricoStandard);
-                setAnchorEl(null);
-                return;
-              }
+          <MenuItem
+            onClick={() => {
+              if (anchorEl) {
+                // Cerca prima negli incarichi standard
+                const incaricoStandard = incarichi.find(
+                  (i) => i.id === anchorEl.id
+                );
+                if (incaricoStandard) {
+                  handleEditIncarico(incaricoStandard);
+                  setAnchorEl(null);
+                  return;
+                }
 
-              // Se non trovato, cerca negli incarichi città
-              const incaricoCitta = incarichiCitta.find(i => i.id === anchorEl.id);
-              if (incaricoCitta) {
-                handleEditIncaricoCitta(incaricoCitta);
-                setAnchorEl(null);
+                // Se non trovato, cerca negli incarichi città
+                const incaricoCitta = incarichiCitta.find(
+                  (i) => i.id === anchorEl.id
+                );
+                if (incaricoCitta) {
+                  handleEditIncaricoCitta(incaricoCitta);
+                  setAnchorEl(null);
+                }
               }
-            }
-          }}>
+            }}
+          >
             <ListItemIcon>
               <EditIcon fontSize="small" />
             </ListItemIcon>
             <ListItemText>Modifica</ListItemText>
           </MenuItem>
-          <MenuItem onClick={() => {
-            if (anchorEl && window.confirm('Sei sicuro di voler eliminare questo incarico?')) {
-              // Cerca prima negli incarichi standard
-              const incaricoStandard = incarichi.find(i => i.id === anchorEl.id);
-              if (incaricoStandard) {
-                deleteDoc(doc(db, 'incarichi', anchorEl.id));
-                caricaIncarichi();
-                setAnchorEl(null);
-                return;
-              }
+          <MenuItem
+            onClick={() => {
+              if (
+                anchorEl &&
+                window.confirm("Sei sicuro di voler eliminare questo incarico?")
+              ) {
+                // Cerca prima negli incarichi standard
+                const incaricoStandard = incarichi.find(
+                  (i) => i.id === anchorEl.id
+                );
+                if (incaricoStandard) {
+                  deleteDoc(doc(db, "incarichi", anchorEl.id));
+                  caricaIncarichi();
+                  setAnchorEl(null);
+                  return;
+                }
 
-              // Se non trovato, cerca negli incarichi città
-              const incaricoCitta = incarichiCitta.find(i => i.id === anchorEl.id);
-              if (incaricoCitta) {
-                handleDeleteIncaricoCitta(incaricoCitta);
-                setAnchorEl(null);
+                // Se non trovato, cerca negli incarichi città
+                const incaricoCitta = incarichiCitta.find(
+                  (i) => i.id === anchorEl.id
+                );
+                if (incaricoCitta) {
+                  handleDeleteIncaricoCitta(incaricoCitta);
+                  setAnchorEl(null);
+                }
               }
-            }
-          }}>
+            }}
+          >
             <ListItemIcon>
               <DeleteIcon fontSize="small" color="error" />
             </ListItemIcon>
-            <ListItemText sx={{ color: 'error.main' }}>Elimina</ListItemText>
+            <ListItemText sx={{ color: "error.main" }}>Elimina</ListItemText>
           </MenuItem>
         </Menu>
       </Box>
