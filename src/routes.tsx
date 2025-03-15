@@ -8,6 +8,7 @@ import GestioneEdifici from './pagine/admin/GestioneEdifici';
 import GestioneIncarichi from './pagine/admin/GestioneIncarichi';
 import GestioneCesti from './pagine/admin/GestioneCesti';
 import GestioneAssegnazioni from './pagine/admin/GestioneAssegnazioni';
+import TestGestioneAssegnazioni from './pagine/admin/TestGestioneAssegnazioni';
 import GestioneCitta from './pagine/admin/GestioneCitta';
 import MieiIncarichi from './pagine/giocatore/MieiIncarichi';
 import Impostazioni from './pagine/admin/Impostazioni';
@@ -18,6 +19,7 @@ import Statistiche from './pagine/admin/Statistiche';
 import Blocchi from './pagine/admin/Blocchi';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import PaginaInCostruzione from './componenti/wiki/PaginaInCostruzione';
+import MieiIncarichiNuovo from "./pagine/giocatore/nuovo/MieiIncarichiNuovo";
 
 // Modifichiamo il componente ProtectedRoute per supportare i moderatori
 const ProtectedRoute: React.FC<{ 
@@ -187,6 +189,16 @@ export default function AppRoutes() {
         }
       />
 
+      {/* Test Nuova Gestione Assegnazioni (admin, coordinatore e moderatori) */}
+      <Route
+        path="/admin/test-assegnazioni"
+        element={
+          <ProtectedRoute requireModOrHigher>
+            <TestGestioneAssegnazioni />
+          </ProtectedRoute>
+        }
+      />
+
       {/* Lista incarichi personali (tutti tranne admin) */}
       <Route
         path="/miei-incarichi"
@@ -245,6 +257,16 @@ export default function AppRoutes() {
             <Blocchi />
           </ProtectedRoute>
         } 
+      />
+
+      {/* Nuovi Miei Incarichi */}
+      <Route
+        path="/giocatore/nuovo/miei-incarichi"
+        element={
+          <ProtectedRoute>
+            <MieiIncarichiNuovo />
+          </ProtectedRoute>
+        }
       />
 
       {/* Route di fallback */}
