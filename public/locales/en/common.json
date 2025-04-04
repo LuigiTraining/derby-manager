@@ -22,7 +22,12 @@
     "successo": "Success",
     "conferma": "Confirm",
     "indietro": "Back",
-    "avanti": "Next"
+    "avanti": "Next",
+    "vista": "View",
+    "cerca_incarichi": "Search tasks",
+    "disponibile_solo_incarichi": "Available only in tasks view",
+    "disponibile_solo_edifici": "Available only in buildings view",
+    "opzioni_ordinamento": "Sorting options"
   },
   "lingua": {
     "seleziona": "Select language",
@@ -53,7 +58,83 @@
   },
   "azioni": {
     "espandi": "Expand",
-    "comprimi": "Collapse"
+    "comprimi": "Collapse",
+    "aggiorna": "Refresh",
+    "sincronizza": "Synchronize",
+    "invia": "Submit",
+    "preset": "Preset",
+    "produzioni": "Productions",
+    "filtra": "Filter",
+    "stampa": "Print",
+    "lista": "List",
+    "normale": "Normal",
+    "tutti": "All",
+    "attivo": "Active",
+    "prossimo": "Next",
+    "full": "Full",
+    "visualizza_per_edificio": "View by building",
+    "visualizza_lista_completa": "View complete list"
+  },
+  "assegnazioni": {
+    "titolo": "Assignments",
+    "giocatore": "Player",
+    "farm": "Farm",
+    "completamento": "Completion",
+    "incarichi": "TASKS",
+    "città": "CITIES",
+    "cesti": "BASKETS",
+    "derby_selezionato": "Selected Derby",
+    "tutti_i_tipi": "All types",
+    "incarichi_disponibili": "Available tasks",
+    "nessun_incarico": "No tasks assigned for this farm.",
+    "nessun_incarico_citta": "No city tasks assigned for this farm.",
+    "nessun_cesto": "No baskets available.",
+    "filtro_assegnati": "Show only assigned",
+    "filtra_tutti": "Show all",
+    "assegna": "Assign",
+    "rimuovi": "Remove",
+    "conferma_elimina": "Are you sure you want to delete all progress? This action cannot be undone.",
+    "ordina": {
+      "alfabetico": "Sort alphabetically",
+      "livello": "Sort by level",
+      "completamento": "Sort by completion"
+    }
+  },
+  "derby": {
+    "attivo": "Active",
+    "prossimo": "Next",
+    "selezionato": "Selected Derby",
+    "tipi": "All types",
+    "nessun_incarico_disponibile": "No tasks available for derby",
+    "nessun_incarico_citta_disponibile": "No city tasks available for derby",
+    "nessun_cesto_disponibile": "No baskets available for derby",
+    "nessun_incarico_citta_trovato": "No city task found.",
+    "nessun_cesto_trovato": "No basket found."
+  },
+  "pulsanti": {
+    "aggiorna": "UPDATE",
+    "sincronizza": "SYNCHRONIZE",
+    "invia": "Submit",
+    "preset": "Preset",
+    "tutti_gli_incarichi": "All tasks"
+  },
+  "messaggi": {
+    "conferma_elimina_progressi": "Are you sure you want to delete all progress? This action cannot be undone.",
+    "nessuna_modifica": "No changes to synchronize",
+    "sincronizza_progressi": "Synchronize progress with server",
+    "aggiorna_tooltip": "Press this button occasionally (once a day or even once a week)",
+    "sincronizza_tooltip": "Press this button when you want to send your production quantities to the admin. For example, you can do this before Derby starts"
+  },
+  "elementi": {
+    "visitatori": "Visitors",
+    "edifici": "Buildings",
+    "progresso": "Progress",
+    "incarichi_nel_cesto": "Tasks in basket"
+  },
+  "progresso": {
+    "completamento": "Completion",
+    "incarichi": "tasks",
+    "incarichi_in_progresso": "Tasks in progress"
   },
   "incarichi": {
     "Affogato": "Affogato",
@@ -188,6 +269,22 @@
     "Yogurt": "Yogurt",
     "Zucchero": "Sugar",
     "Zuppa di funghi": "Mushroom Soup",
-    "Zuppa di pomodoro": "Tomato Soup"
+    "Zuppa di pomodoro": "Tomato Soup",
+    "Aiuti": "Helps",
+    "Patate": "Potatoes",
+    "Nutrizione": "Nutrition",
+    "Latte di capra": "Goat Milk",
+    "Carote": "Carrots",
+    "Granturco": "Corn",
+    "Eggs": "Eggs",
+    "Tomatoes": "Tomatoes",
+    "Onigiri": "Onigiri",
+    "Pasta ai funghi": "Mushroom Pasta",
+    "Peperoncini ripieni": "Stuffed Peppers",
+    "Samosa": "Samosa",
+    "Succo di guaiava": "Guava Juice",
+    "Yogurt bianco": "Plain Yogurt",
+    "Yogurt alla fragola": "Strawberry Yogurt",
+    "Bouquet di verdure": "Vegetable Bouquet"
   }
 }

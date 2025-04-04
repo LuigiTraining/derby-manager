@@ -1,0 +1,2 @@
+﻿{giocatore.completato ? \
+1\ : \\}

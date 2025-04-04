@@ -18,6 +18,7 @@ import {
   useMediaQuery,
   Badge,
   Collapse,
+  Chip,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import DashboardIcon from "@mui/icons-material/Dashboard";
@@ -63,6 +64,8 @@ interface MenuItem {
   icon: React.ReactNode;
   path?: string;
   children?: MenuItem[];
+  chip?: React.ReactNode;
+  sx?: React.CSSProperties;
 }
 
 interface Props {
@@ -172,17 +175,16 @@ export default function Layout({ children }: Props) {
           path: "/dashboard",
         },
         {
-          text: t("barraLaterale.assegnazioni"),
+          text: "Assegnazioni",
           icon: <AssignmentIcon />,
-          path: "/admin/assegnazioni",
+          path: "/admin/test-assegnazioni",
+          sx: { backgroundColor: 'rgba(255, 0, 0, 0.05)' }
         },
         {
-          text:
-            currentUser.ruolo === "admin"
-              ? t("barraLaterale.listaGlobale")
-              : t("barraLaterale.listaGlobale"),
+          text: t("barraLaterale.listaGlobale"),
           icon: <TaskIcon />,
-          path: "/miei-incarichi",
+          path: "/giocatore/nuovo/miei-incarichi",
+          sx: { backgroundColor: 'rgba(255, 0, 0, 0.05)' }
         },
         {
           text: t("barraLaterale.blocchi"),
@@ -258,14 +260,21 @@ export default function Layout({ children }: Props) {
           path: "/dashboard",
         },
         {
-          text: t("barraLaterale.assegnazioni"),
+          text: "Assegnazioni",
           icon: <AssignmentIcon />,
-          path: "/admin/assegnazioni",
+          path: "/admin/test-assegnazioni",
+          sx: { backgroundColor: 'rgba(255, 0, 0, 0.05)' }
         },
         {
           text: t("barraLaterale.listaGlobale"),
           icon: <TaskIcon />,
-          path: "/miei-incarichi",
+          path: "/giocatore/nuovo/miei-incarichi",
+          sx: { backgroundColor: 'rgba(255, 0, 0, 0.05)' }
+        },
+        {
+          text: t("barraLaterale.blocchi"),
+          icon: <BlockIcon />,
+          path: "/admin/blocchi",
         },
         {
           text: t("barraLaterale.giocatori"),
@@ -309,9 +318,10 @@ export default function Layout({ children }: Props) {
         ],
       },
       {
-        text: t("barraLaterale.listaGlobale"),
+        text: "Lista",
         icon: <TaskIcon />,
-        path: "/miei-incarichi",
+        path: "/giocatore/nuovo/miei-incarichi",
+        sx: { backgroundColor: 'rgba(255, 0, 0, 0.05)' }
       },
       {
         text: t("barraLaterale.blocchi"),
@@ -363,9 +373,11 @@ export default function Layout({ children }: Props) {
           <ListItemButton
             selected={isSelected}
             onClick={() => handleMenuClick(item)}
+            sx={item.sx}
           >
             <ListItemIcon>{item.icon}</ListItemIcon>
             <ListItemText primary={item.text} />
+            {item.chip && item.chip}
             {item.children && (isExpanded ? <ExpandLess /> : <ExpandMore />)}
           </ListItemButton>
         </ListItem>
@@ -457,6 +469,19 @@ export default function Layout({ children }: Props) {
           </IconButton>
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             {menuItems.reduce((title, item) => {
+              // Caso speciale per il percorso "/admin/test-assegnazioni"
+              if (location.pathname === "/admin/test-assegnazioni") return "Assegnazioni";
+              
+              // Caso speciale per il percorso "/giocatore/nuovo/miei-incarichi"
+              if (location.pathname === "/giocatore/nuovo/miei-incarichi") {
+                // Mostra "Lista globale" per admin e moderatori, "Lista" per i giocatori
+                if (["admin", "coordinatore", "moderatore"].includes(currentUser?.ruolo || "")) {
+                  return t("barraLaterale.listaGlobale");
+                } else {
+                  return "Lista";
+                }
+              }
+              
               if (item.path === location.pathname) return item.text;
               if (item.children) {
                 const child = item.children.find(

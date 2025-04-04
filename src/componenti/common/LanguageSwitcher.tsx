@@ -10,6 +10,7 @@ import {
 } from "@mui/material";
 import { Language as LanguageIcon } from "@mui/icons-material";
 import { IT, GB, ES, FR } from "country-flag-icons/react/3x2";
+import { changeLanguage } from "../../i18n";
 
 // Mappa delle lingue con le relative bandiere
 const languageFlags = {
@@ -42,9 +43,13 @@ const LanguageSwitcher = () => {
     setAnchorEl(null);
   };
 
-  // Cambia la lingua
-  const changeLanguage = (language: string) => {
-    i18n.changeLanguage(language);
+  // Cambia la lingua usando la funzione esportata da i18n.ts
+  const handleChangeLanguage = (language: string) => {
+    changeLanguage(language).then(() => {
+      console.log(`Lingua cambiata in: ${language} nel componente LanguageSwitcher`);
+      // Forza il refresh dell'interfaccia ricaricando la pagina
+      window.location.reload();
+    });
     handleClose();
   };
 
@@ -80,7 +85,7 @@ const LanguageSwitcher = () => {
         {Object.keys(languageFlags).map((lang) => (
           <MenuItem
             key={lang}
-            onClick={() => changeLanguage(lang)}
+            onClick={() => handleChangeLanguage(lang)}
             selected={currentLanguage === lang}
             sx={{
               display: "flex",

@@ -6,8 +6,16 @@ import {
   Typography,
   IconButton,
   Avatar,
+  TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Stack,
+  Chip,
 } from '@mui/material';
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate';
+import LinkIcon from '@mui/icons-material/Link';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { storage } from '../../configurazione/firebase';
@@ -32,6 +40,9 @@ export default function UploadImmagine({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
+  const [dialogoUrlAperto, setDialogoUrlAperto] = useState(false);
+  const [urlEsterno, setUrlEsterno] = useState('');
+  const [erroreUrl, setErroreUrl] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleClick = () => {
@@ -57,11 +68,14 @@ export default function UploadImmagine({
     try {
       // Se c'è già un'immagine, eliminiamola
       if (urlImmagine) {
-        const vecchioRef = ref(storage, urlImmagine);
-        try {
-          await deleteObject(vecchioRef);
-        } catch (error) {
-          console.error('Errore nell\'eliminazione della vecchia immagine:', error);
+        // Verifica se l'URL è da Firebase Storage (non eliminare URL esterni)
+        if (urlImmagine.includes('firebasestorage.googleapis.com')) {
+          const vecchioRef = ref(storage, urlImmagine);
+          try {
+            await deleteObject(vecchioRef);
+          } catch (error) {
+            console.error('Errore nell\'eliminazione della vecchia immagine:', error);
+          }
         }
       }
 
@@ -98,8 +112,11 @@ export default function UploadImmagine({
 
     setLoading(true);
     try {
-      const imageRef = ref(storage, urlImmagine);
-      await deleteObject(imageRef);
+      // Verifica se l'URL è da Firebase Storage
+      if (urlImmagine.includes('firebasestorage.googleapis.com')) {
+        const imageRef = ref(storage, urlImmagine);
+        await deleteObject(imageRef);
+      }
       onImmagineEliminata();
     } catch (error) {
       console.error('Errore nell\'eliminazione dell\'immagine:', error);
@@ -134,6 +151,63 @@ export default function UploadImmagine({
     const file = e.dataTransfer.files?.[0];
     if (!file) return;
     await handleUpload(file);
+  };
+
+  const apriDialogoUrl = () => {
+    setDialogoUrlAperto(true);
+    setUrlEsterno('');
+    setErroreUrl('');
+  };
+
+  const chiudiDialogoUrl = () => {
+    setDialogoUrlAperto(false);
+  };
+
+  const validateUrl = (url: string) => {
+    try {
+      new URL(url);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const handleUsaUrl = () => {
+    if (!validateUrl(urlEsterno)) {
+      setErroreUrl('URL non valido');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    
+    // Controlla se l'URL è un'immagine
+    fetch(urlEsterno, { method: 'HEAD' })
+      .then(response => {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.startsWith('image/')) {
+          // Se abbiamo un URL di Firebase Storage, eliminiamo la vecchia immagine
+          if (urlImmagine && urlImmagine.includes('firebasestorage.googleapis.com')) {
+            const vecchioRef = ref(storage, urlImmagine);
+            deleteObject(vecchioRef).catch(error => {
+              console.error('Errore nell\'eliminazione della vecchia immagine:', error);
+            });
+          }
+          
+          // Usa direttamente l'URL esterno
+          onImmagineCaricata(urlEsterno);
+          chiudiDialogoUrl();
+        } else {
+          setErroreUrl('L\'URL non contiene un\'immagine valida');
+        }
+      })
+      .catch(error => {
+        console.error('Errore nel controllare l\'URL:', error);
+        setErroreUrl('Impossibile accedere all\'URL');
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
 
   return (
@@ -193,19 +267,47 @@ export default function UploadImmagine({
             >
               <DeleteIcon sx={{ color: 'white' }} />
             </IconButton>
+            {urlImmagine && !urlImmagine.includes('firebasestorage.googleapis.com') && (
+              <Chip
+                label="URL"
+                size="small"
+                color="primary"
+                sx={{
+                  position: 'absolute',
+                  bottom: 8,
+                  left: 8,
+                  fontSize: '0.7rem',
+                  height: 20,
+                  opacity: 0.8,
+                }}
+              />
+            )}
           </>
         ) : (
-          <Button
-            onClick={handleClick}
-            sx={{ height: '100%', width: '100%' }}
-          >
-            <Box sx={{ textAlign: 'center' }}>
-              <AddPhotoAlternateIcon sx={{ fontSize: 32, mb: 1, color: 'action.active' }} />
-              <Typography variant="body2" color="text.secondary">
-                {isDragging ? 'Rilascia qui' : 'Carica icona'}
-              </Typography>
-            </Box>
-          </Button>
+          <Stack direction="column" spacing={1} sx={{ width: '100%', height: '100%' }}>
+            <Button
+              onClick={handleClick}
+              sx={{ height: '50%', width: '100%' }}
+            >
+              <Box sx={{ textAlign: 'center' }}>
+                <AddPhotoAlternateIcon sx={{ fontSize: 32, mb: 1, color: 'action.active' }} />
+                <Typography variant="body2" color="text.secondary">
+                  {isDragging ? 'Rilascia qui' : 'Carica dal PC'}
+                </Typography>
+              </Box>
+            </Button>
+            <Button
+              onClick={apriDialogoUrl}
+              sx={{ height: '50%', width: '100%' }}
+            >
+              <Box sx={{ textAlign: 'center' }}>
+                <LinkIcon sx={{ fontSize: 32, mb: 1, color: 'action.active' }} />
+                <Typography variant="body2" color="text.secondary">
+                  Usa URL esterno
+                </Typography>
+              </Box>
+            </Button>
+          </Stack>
         )}
       </Box>
 
@@ -214,6 +316,30 @@ export default function UploadImmagine({
           {error}
         </Typography>
       )}
+
+      {/* Dialogo per inserire URL */}
+      <Dialog open={dialogoUrlAperto} onClose={chiudiDialogoUrl}>
+        <DialogTitle>Inserisci URL dell'immagine</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            margin="dense"
+            label="URL dell'immagine"
+            type="url"
+            fullWidth
+            variant="outlined"
+            value={urlEsterno}
+            onChange={(e) => setUrlEsterno(e.target.value)}
+            error={!!erroreUrl}
+            helperText={erroreUrl}
+            placeholder="https://static.wikia.nocookie.net/hayday/images/4/47/Bakery.png"
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={chiudiDialogoUrl}>Annulla</Button>
+          <Button onClick={handleUsaUrl} disabled={!urlEsterno}>Usa</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

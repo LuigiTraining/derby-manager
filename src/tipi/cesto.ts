@@ -12,6 +12,7 @@ export interface Cesto {
   incarichi: IncaricoInCesto[];
   data_creazione: Date;
   note?: string;
+  derby_tags?: string[]; // Array di ID dei derby associati a questo cesto
 }
 
 // Tipo per il livello del cesto (calcolato in base agli incarichi contenuti)

@@ -1,0 +1,7 @@
+// Effetto per aggiornare i ref alle funzioni
+useEffect(() => {
+  caricaAssegnazioniRef.current = caricaAssegnazioni;
+  caricaProgressiRef.current = caricaProgressi;
+  verificaModificheNonSincronizzateRef.current = verificaModificheNonSincronizzate;
+  caricaProgressiLocaliRef.current = caricaProgressiLocali;
+}, [caricaAssegnazioni, caricaProgressi, verificaModificheNonSincronizzate, caricaProgressiLocali]);

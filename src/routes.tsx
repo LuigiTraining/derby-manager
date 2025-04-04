@@ -7,10 +7,8 @@ import GestioneGiocatori from './pagine/admin/GestioneGiocatori';
 import GestioneEdifici from './pagine/admin/GestioneEdifici';
 import GestioneIncarichi from './pagine/admin/GestioneIncarichi';
 import GestioneCesti from './pagine/admin/GestioneCesti';
-import GestioneAssegnazioni from './pagine/admin/GestioneAssegnazioni';
 import TestGestioneAssegnazioni from './pagine/admin/TestGestioneAssegnazioni';
 import GestioneCitta from './pagine/admin/GestioneCitta';
-import MieiIncarichi from './pagine/giocatore/MieiIncarichi';
 import Impostazioni from './pagine/admin/Impostazioni';
 import WikiPage from './componenti/wiki/WikiPage';
 import Inizializzazione from './pagine/admin/Inizializzazione';
@@ -183,9 +181,7 @@ export default function AppRoutes() {
       <Route
         path="/admin/assegnazioni"
         element={
-          <ProtectedRoute requireModOrHigher>
-            <GestioneAssegnazioni />
-          </ProtectedRoute>
+          <Navigate to="/admin/test-assegnazioni" replace />
         }
       />
 
@@ -203,9 +199,7 @@ export default function AppRoutes() {
       <Route
         path="/miei-incarichi"
         element={
-          <ProtectedRoute>
-            <MieiIncarichi />
-          </ProtectedRoute>
+          <Navigate to="/giocatore/nuovo/miei-incarichi" replace />
         }
       />
 

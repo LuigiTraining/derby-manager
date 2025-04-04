@@ -22,7 +22,12 @@
     "successo": "Successo",
     "conferma": "Conferma",
     "indietro": "Indietro",
-    "avanti": "Avanti"
+    "avanti": "Avanti",
+    "vista": "Vista",
+    "cerca_incarichi": "Cerca incarichi",
+    "disponibile_solo_incarichi": "Disponibile solo nella vista incarichi",
+    "disponibile_solo_edifici": "Disponibile solo nella vista edifici",
+    "opzioni_ordinamento": "Opzioni di ordinamento"
   },
   "lingua": {
     "seleziona": "Seleziona lingua",
@@ -53,7 +58,83 @@
   },
   "azioni": {
     "espandi": "Espandi",
-    "comprimi": "Comprimi"
+    "comprimi": "Comprimi",
+    "aggiorna": "Aggiorna",
+    "sincronizza": "Sincronizza",
+    "invia": "Invia",
+    "preset": "Preset",
+    "produzioni": "Produzioni",
+    "filtra": "Filtra",
+    "stampa": "Stampa",
+    "lista": "Lista",
+    "normale": "Normale",
+    "tutti": "Tutti",
+    "attivo": "Attivo",
+    "prossimo": "Prossimo",
+    "full": "Completo",
+    "visualizza_per_edificio": "Visualizza per edificio",
+    "visualizza_lista_completa": "Visualizza lista completa"
+  },
+  "assegnazioni": {
+    "titolo": "Assegnazioni",
+    "giocatore": "Giocatore",
+    "farm": "Farm",
+    "completamento": "Completamento",
+    "incarichi": "INCARICHI",
+    "città": "CITTÀ",
+    "cesti": "CESTI",
+    "derby_selezionato": "Derby selezionato",
+    "tutti_i_tipi": "Tutti i tipi",
+    "incarichi_disponibili": "Incarichi disponibili",
+    "nessun_incarico": "Nessun incarico assegnato per questa farm.",
+    "nessun_incarico_citta": "Nessun incarico città assegnato per questa farm.",
+    "nessun_cesto": "Nessun cesto disponibile.",
+    "filtro_assegnati": "Mostra solo assegnati",
+    "filtra_tutti": "Mostra tutti",
+    "assegna": "Assegna",
+    "rimuovi": "Rimuovi",
+    "conferma_elimina": "Sei sicuro di voler eliminare tutti i progressi? Questa azione non può essere annullata.",
+    "ordina": {
+      "alfabetico": "Ordina alfabeticamente",
+      "livello": "Ordina per livello",
+      "completamento": "Ordina per completamento"
+    }
+  },
+  "derby": {
+    "attivo": "Attivo",
+    "prossimo": "Prossimo",
+    "selezionato": "Derby selezionato",
+    "tipi": "Tutti i tipi",
+    "nessun_incarico_disponibile": "Non ci sono incarichi disponibili per il derby",
+    "nessun_incarico_citta_disponibile": "Non ci sono incarichi città disponibili per il derby",
+    "nessun_cesto_disponibile": "Non ci sono cesti disponibili per il derby",
+    "nessun_incarico_citta_trovato": "Nessun incarico città trovato.",
+    "nessun_cesto_trovato": "Nessun cesto trovato."
+  },
+  "pulsanti": {
+    "aggiorna": "AGGIORNA",
+    "sincronizza": "SINCRONIZZA",
+    "invia": "Invia",
+    "preset": "Preset",
+    "tutti_gli_incarichi": "Tutti gli incarichi"
+  },
+  "messaggi": {
+    "conferma_elimina_progressi": "Sei sicuro di voler eliminare tutti i progressi? Questa azione non può essere annullata.",
+    "nessuna_modifica": "Nessuna modifica da sincronizzare",
+    "sincronizza_progressi": "Sincronizza progressi con il server",
+    "aggiorna_tooltip": "Premi questo pulsante una volta ogni tanto (1 volta al giorno o anche 1 volta a settimana)",
+    "sincronizza_tooltip": "Premi questo pulsante quando desideri inviare le quantità prodotte all'admin. Per esempio puoi farlo prima dell'inizio dei Derby"
+  },
+  "elementi": {
+    "visitatori": "Visitatori",
+    "edifici": "Edifici",
+    "progresso": "Progresso",
+    "incarichi_nel_cesto": "Incarichi nel cesto"
+  },
+  "progresso": {
+    "completamento": "Completamento",
+    "incarichi": "incarichi",
+    "incarichi_in_progresso": "Incarichi in progresso"
   },
   "incarichi": {
     "Affogato": "Affogato",
@@ -61,6 +142,7 @@
     "Anelli di cipolla": "Anelli di cipolla",
     "Barca": "Barca",
     "Barrette di cocco e ananas": "Barrette di cocco e ananas",
+    "Barretta di cioccolato fritta": "Barretta di cioccolato fritta",
     "Biscotto": "Biscotti",
     "Biscotti al cioccolato": "Biscotti al cioccolato",
     "Biscotti alla cannella": "Biscotti alla cannella",
@@ -102,6 +184,7 @@
     "Farina": "Farina",
     "Fiori": "Fiori",
     "Fonduta di pancetta": "Fonduta di pancetta",
+    "Fonduta tropicale": "Fonduta tropicale",
     "Formaggio": "Formaggio",
     "Formaggio di capra": "Formaggio di capra",
     "Fragole": "Fragole",
@@ -188,6 +271,22 @@
     "Yogurt": "Yogurt",
     "Zucchero": "Zucchero",
     "Zuppa di funghi": "Zuppa di funghi",
-    "Zuppa di pomodoro": "Zuppa di pomodoro"
+    "Zuppa di pomodoro": "Zuppa di pomodoro",
+    "Aiuti": "Aiuti",
+    "Patate": "Patate",
+    "Nutrizione": "Nutrizione",
+    "Latte di capra": "Latte di capra",
+    "Carote": "Carote",
+    "Granturco": "Granturco",
+    "Eggs": "Uova",
+    "Tomatoes": "Pomodori",
+    "Onigiri": "Onigiri",
+    "Pasta ai funghi": "Pasta ai funghi",
+    "Peperoncini ripieni": "Peperoncini ripieni",
+    "Samosa": "Samosa",
+    "Succo di guaiava": "Succo di guaiava",
+    "Yogurt bianco": "Yogurt bianco",
+    "Yogurt alla fragola": "Yogurt alla fragola",
+    "Bouquet di verdure": "Bouquet di verdure"
   }
 }

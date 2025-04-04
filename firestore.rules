@@ -1,0 +1,59 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Consenti la lettura di tutte le collezioni a chiunque
+    match /{document=**} {
+      allow read: if true;
+    }
+    
+    // Collezioni principali - consenti la scrittura (sarebbe meglio limitarla agli utenti autenticati,
+    // ma poiché usi un sistema personalizzato di autenticazione con PIN, non possiamo usare request.auth)
+    match /annunci/{document} {
+      allow write: if true;
+    }
+    match /assegnazioni/{document} {
+      allow write: if true;
+    }
+    match /cesti/{document} {
+      allow write: if true;
+    }
+    match /derby/{document} {
+      allow write: if true;
+    }
+    match /elementi_citta/{document} {
+      allow write: if true;
+    }
+    match /impostazioni/{document} {
+      allow write: if true;
+    }
+    match /incarichi/{document} {
+      allow write: if true;
+    }
+    match /incarichi_citta/{document} {
+      allow write: if true;
+    }
+    match /notifiche_subscriptions/{document} {
+      allow write: if true;
+    }
+    match /progressi/{document} {
+      allow write: if true;
+    }
+    match /progressi_incarichi/{document} {
+      allow write: if true;
+    }
+    match /richieste_registrazione/{document} {
+      allow write: if true;
+    }
+    match /utenti/{document} {
+      allow write: if true;
+    }
+    match /wiki_pages/{document} {
+      allow write: if true;
+    }
+    
+    // Per tutte le altre collezioni o sottocollezioni, consenti anche la scrittura
+    match /{path=**}/{document} {
+      allow write: if true;
+    }
+  }
+} 

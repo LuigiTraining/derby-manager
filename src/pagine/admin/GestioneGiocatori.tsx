@@ -44,6 +44,8 @@ import {
   Divider,
   OutlinedInput,
   Checkbox,
+  List,
+  ListItem,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import EditIcon from "@mui/icons-material/Edit";
@@ -74,6 +76,7 @@ import {
   deleteDoc,
   onSnapshot,
   updateDoc,
+  writeBatch,
 } from "firebase/firestore";
 import { db } from "../../configurazione/firebase";
 import { Giocatore, Farm, StatoFarm } from "../../tipi/giocatore";
@@ -83,6 +86,8 @@ import { useAuth } from "../../componenti/autenticazione/AuthContext";
 import { countries, getCountryName } from "../../utils/countries";
 import * as countryFlags from "country-flag-icons/react/3x2";
 import { Derby } from "../../tipi/derby"; // Aggiungo l'import
+import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 
 // Tipo per le opzioni di filtro
 type FilterMode = "players" | "farms";
@@ -151,7 +156,7 @@ const farmVuota = (): FarmForm => ({
   diamanti: undefined,
   stato: "attivo",
   principale: true,
-  livello: undefined,
+  livello: 1,
   immagine: "",
   derby_tags: [], // Inizializzo come array vuoto
 });
@@ -171,11 +176,13 @@ interface GiocatoreForm {
 
 interface FormData {
   nome: string;
+  pin: number;
   contatto: string;
   contattoVisibile: boolean;
   note: string;
   eta: string;
   nazionalita: string;
+  immagine?: string;
   farms: {
     nome: string;
     tag: string;
@@ -183,7 +190,10 @@ interface FormData {
     stato: StatoFarm;
     principale: boolean;
     livello: number;
+    derby_tags?: string[];
   }[];
+  expandedPersonalInfo: boolean;
+  farmExpanded: boolean[];
 }
 
 export default function GestioneGiocatori() {
@@ -204,6 +214,96 @@ export default function GestioneGiocatori() {
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [derby, setDerby] = useState<Derby[]>([]); // Aggiungo lo state per i derby
+
+  // Stati per filtri e visualizzazione con inizializzazione da localStorage
+  const [filterMode, setFilterMode] = useState<FilterMode>(() => {
+    try {
+      return (
+        (localStorage.getItem("gestioneGiocatori_filterMode") as FilterMode) ||
+        "players"
+      );
+    } catch {
+      return "players";
+    }
+  });
+  
+  const [sortBy, setSortBy] = useState<SortOption>(() => {
+    try {
+      return (
+        (localStorage.getItem("gestioneGiocatori_sortBy") as SortOption) ||
+        "name"
+      );
+    } catch {
+      return "name";
+    }
+  });
+
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">(() => {
+    try {
+      return (
+        (localStorage.getItem("gestioneGiocatori_sortDirection") as
+          | "asc"
+          | "desc") || "asc"
+      );
+    } catch {
+      return "asc";
+    }
+  });
+  
+  const [filterCountry, setFilterCountry] = useState<string>(() => {
+    try {
+      return localStorage.getItem("gestioneGiocatori_filterCountry") || "";
+    } catch {
+      return "";
+    }
+  });
+
+  const [filterFarmStatus, setFilterFarmStatus] = useState<
+    "all" | "active" | "inactive"
+  >(() => {
+    try {
+      return (
+        (localStorage.getItem("gestioneGiocatori_filterFarmStatus") as
+          | "all"
+          | "active"
+          | "inactive") || "all"
+      );
+    } catch {
+      return "all";
+    }
+  });
+
+  // Stati per l'ordinamento delle farm con inizializzazione da localStorage
+  const [farmSortBy, setFarmSortBy] = useState<
+    "farmName" | "playerName" | "level" | "diamonds" | "status"
+  >(() => {
+    try {
+      return (
+        (localStorage.getItem("gestioneGiocatori_farmSortBy") as
+          | "farmName"
+          | "playerName"
+          | "level"
+          | "diamonds"
+          | "status") || "farmName"
+      );
+    } catch {
+      return "farmName";
+    }
+  });
+
+  const [farmSortDirection, setFarmSortDirection] = useState<"asc" | "desc">(
+    () => {
+      try {
+        return (
+          (localStorage.getItem("gestioneGiocatori_farmSortDirection") as
+            | "asc"
+            | "desc") || "asc"
+        );
+      } catch {
+        return "asc";
+      }
+    }
+  );
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -234,6 +334,7 @@ export default function GestioneGiocatori() {
     (text: string | undefined | null) => {
       if (!searchQuery) return true;
       if (!text) return false;
+      
       const normalizedText = text
         .toLowerCase()
         .normalize("NFD")
@@ -267,13 +368,34 @@ export default function GestioneGiocatori() {
       g.farms.every((f) => f.stato === "inattivo")
     );
 
-    // Ordina alfabeticamente entrambi i gruppi
-    giocatoriConFarmAttive.sort((a, b) => a.nome.localeCompare(b.nome));
-    giocatoriSenzaFarmAttive.sort((a, b) => a.nome.localeCompare(b.nome));
+    // Applichiamo l'ordinamento prima ai giocatori con farm attive
+    const ordina = (a: Giocatore, b: Giocatore) => {
+      let comparison = 0;
+      switch (sortBy) {
+        case "name":
+          comparison = a.nome.localeCompare(b.nome);
+          break;
+        case "age":
+          comparison = (a.eta || 0) - (b.eta || 0);
+          break;
+        case "country":
+          comparison = (a.nazionalita || "").localeCompare(b.nazionalita || "");
+          break;
+        case "farmCount":
+          comparison = a.farms.length - b.farms.length;
+          break;
+        default:
+          comparison = a.nome.localeCompare(b.nome);
+      }
+      return sortDirection === "asc" ? comparison : -comparison;
+    };
+
+    giocatoriConFarmAttive.sort(ordina);
+    giocatoriSenzaFarmAttive.sort(ordina);
 
     // Combina i due gruppi
     return [...giocatoriConFarmAttive, ...giocatoriSenzaFarmAttive];
-  }, [giocatori, searchQuery, matchSearch]);
+  }, [giocatori, searchQuery, matchSearch, sortBy, sortDirection]);
 
   // Effetto per gestire l'espansione automatica durante la ricerca
   useEffect(() => {
@@ -384,6 +506,8 @@ export default function GestioneGiocatori() {
         immagine: farm.immagine || "",
         derby_tags: farm.derby_tags || [],
       })),
+      expandedPersonalInfo: false,
+      farmExpanded: giocatore.farms.map(() => false),
     });
     setOpenDialog(true);
   };
@@ -400,6 +524,8 @@ export default function GestioneGiocatori() {
       eta: "",
       nazionalita: "",
       farms: [farmVuota()],
+      expandedPersonalInfo: true,
+      farmExpanded: [true],
     });
     setOpenDialog(true);
   };
@@ -474,7 +600,7 @@ export default function GestioneGiocatori() {
       });
 
       // Prepara i dati del giocatore rimuovendo i campi undefined
-      const cleanData = {
+      const cleanData: any = {
         nome: formData.nome,
         contatto: formData.contatto || "",
         contattoVisibile: Boolean(formData.contattoVisibile),
@@ -522,40 +648,28 @@ export default function GestioneGiocatori() {
     }
   };
 
+  const [expandedPlayers, setExpandedPlayers] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("expandedPlayers") || "[]");
+    } catch {
+      return [];
+    }
+  });
+  const [expandedPresentations, setExpandedPresentations] = useState<string[]>(
+    []
+  );
   const [formData, setFormData] = useState<FormData>({
     nome: "",
     pin: generaPIN(),
     contatto: "",
     contattoVisibile: false,
     note: "",
-    immagine: "",
     eta: "",
     nazionalita: "",
     farms: [farmVuota()],
+    expandedPersonalInfo: true,
+    farmExpanded: [true],
   });
-
-  // Stato per gestire i pannelli espandibili
-  const [expandedPlayers, setExpandedPlayers] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem("gestioneGiocatori_expandedPlayers");
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
-
-  const [expandedPresentations, setExpandedPresentations] = useState<string[]>(
-    () => {
-      try {
-        const saved = localStorage.getItem(
-          "gestioneGiocatori_expandedPresentations"
-        );
-        return saved ? JSON.parse(saved) : [];
-      } catch {
-        return [];
-      }
-    }
-  );
 
   // Inizializzazione dello stato dei filtri senza localStorage
   const [expandedFilters, setExpandedFilters] = useState(false);
@@ -671,96 +785,6 @@ export default function GestioneGiocatori() {
     // Rimuovi spazi e # e converti in maiuscolo
     return tag.replace(/[\s#]/g, "").toUpperCase();
   };
-
-  // Stati per filtri e visualizzazione con inizializzazione da localStorage
-  const [filterMode, setFilterMode] = useState<FilterMode>(() => {
-    try {
-      return (
-        (localStorage.getItem("gestioneGiocatori_filterMode") as FilterMode) ||
-        "players"
-      );
-    } catch {
-      return "players";
-    }
-  });
-
-  const [sortBy, setSortBy] = useState<SortOption>(() => {
-    try {
-      return (
-        (localStorage.getItem("gestioneGiocatori_sortBy") as SortOption) ||
-        "name"
-      );
-    } catch {
-      return "name";
-    }
-  });
-
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">(() => {
-    try {
-      return (
-        (localStorage.getItem("gestioneGiocatori_sortDirection") as
-          | "asc"
-          | "desc") || "asc"
-      );
-    } catch {
-      return "asc";
-    }
-  });
-
-  const [filterCountry, setFilterCountry] = useState<string>(() => {
-    try {
-      return localStorage.getItem("gestioneGiocatori_filterCountry") || "";
-    } catch {
-      return "";
-    }
-  });
-
-  const [filterFarmStatus, setFilterFarmStatus] = useState<
-    "all" | "active" | "inactive"
-  >(() => {
-    try {
-      return (
-        (localStorage.getItem("gestioneGiocatori_filterFarmStatus") as
-          | "all"
-          | "active"
-          | "inactive") || "all"
-      );
-    } catch {
-      return "all";
-    }
-  });
-
-  // Stati per l'ordinamento delle farm con inizializzazione da localStorage
-  const [farmSortBy, setFarmSortBy] = useState<
-    "farmName" | "playerName" | "level" | "diamonds" | "status"
-  >(() => {
-    try {
-      return (
-        (localStorage.getItem("gestioneGiocatori_farmSortBy") as
-          | "farmName"
-          | "playerName"
-          | "level"
-          | "diamonds"
-          | "status") || "farmName"
-      );
-    } catch {
-      return "farmName";
-    }
-  });
-
-  const [farmSortDirection, setFarmSortDirection] = useState<"asc" | "desc">(
-    () => {
-      try {
-        return (
-          (localStorage.getItem("gestioneGiocatori_farmSortDirection") as
-            | "asc"
-            | "desc") || "asc"
-        );
-      } catch {
-        return "asc";
-      }
-    }
-  );
 
   // Effetti per salvare gli stati nel localStorage
   useEffect(() => {
@@ -1102,6 +1126,10 @@ export default function GestioneGiocatori() {
     if (!selectedGiocatore) return;
 
     try {
+      // Prima eliminiamo tutte le assegnazioni relative alle farm del giocatore
+      await eliminaAssegnazioniGiocatore(selectedGiocatore);
+      
+      // Poi eliminiamo il giocatore
       await deleteDoc(doc(db, "utenti", selectedGiocatore.id));
       setSuccess("Giocatore eliminato con successo");
       caricaGiocatori();
@@ -1109,6 +1137,88 @@ export default function GestioneGiocatori() {
     } catch (error) {
       console.error("Errore nell'eliminazione:", error);
       setError("Errore nell'eliminazione del giocatore");
+    }
+  };
+
+  // Funzione per eliminare tutte le assegnazioni e i progressi di un giocatore
+  const eliminaAssegnazioniGiocatore = async (giocatore: Giocatore) => {
+    try {
+      // Ottieni l'ID del giocatore
+      const userIdPrefix = giocatore.id;
+      const pinGiocatore = giocatore.pin.toString();
+      
+      // Costruisci gli ID farm del giocatore (nel formato userId_index o pin_index)
+      // Consideriamo entrambi i formati possibili per essere sicuri
+      const farmIds = [
+        ...giocatore.farms.map((_, index) => `${userIdPrefix}_${index}`),
+        ...giocatore.farms.map((_, index) => `${pinGiocatore}_${index}`)
+      ];
+      console.log(`IDs farm da cercare:`, farmIds);
+      
+      // Batch per le operazioni multiple
+      const batch = writeBatch(db);
+      let contatoreAssegnazioni = 0;
+      let contatoreProgressi = 0;
+      
+      // 1. Eliminazione delle assegnazioni
+      const assegnazioniRef = collection(db, "assegnazioni");
+      const assegnazioniSnapshot = await getDocs(assegnazioniRef);
+      
+      assegnazioniSnapshot.forEach((doc) => {
+        const assegnazione = doc.data();
+        // Verifica se farm_id corrisponde a una delle farm del giocatore
+        if (assegnazione.farm_id && farmIds.includes(assegnazione.farm_id)) {
+          batch.delete(doc.ref);
+          contatoreAssegnazioni++;
+          console.log(`Eliminata assegnazione con farm_id ${assegnazione.farm_id}`, doc.id);
+        }
+      });
+      
+      // 2. Eliminazione dei progressi
+      const progressiRef = collection(db, "progressi");
+      const progressiSnapshot = await getDocs(progressiRef);
+      
+      console.log(`Esaminando ${progressiSnapshot.size} documenti di progressi`);
+      
+      // Stampa dettagli di ogni progresso per debug
+      progressiSnapshot.forEach((doc) => {
+        const progresso = doc.data();
+        console.log(`Progresso ID ${doc.id}:`, progresso);
+        
+        // Verifica esatta con farmIds
+        if (progresso.farm_id && farmIds.includes(progresso.farm_id)) {
+          batch.delete(doc.ref);
+          contatoreProgressi++;
+          console.log(`MATCH ESATTO: Eliminato progresso con farm_id ${progresso.farm_id}`, doc.id);
+        } 
+        // Verifica alternativa che controlla se il farm_id inizia con il PIN del giocatore
+        else if (progresso.farm_id && progresso.farm_id.startsWith(`${pinGiocatore}_`)) {
+          batch.delete(doc.ref);
+          contatoreProgressi++;
+          console.log(`MATCH PER PIN: Eliminato progresso con farm_id ${progresso.farm_id}`, doc.id);
+        }
+        // Se il farm_id include il PIN da qualche parte
+        else if (progresso.farm_id && progresso.farm_id.includes(pinGiocatore)) {
+          batch.delete(doc.ref);
+          contatoreProgressi++;
+          console.log(`MATCH PER PIN INCLUSO: Eliminato progresso con farm_id ${progresso.farm_id}`, doc.id);
+        }
+      });
+      
+      // 3. Esecuzione del batch se ci sono documenti da eliminare
+      if (contatoreAssegnazioni > 0 || contatoreProgressi > 0) {
+        await batch.commit();
+        const messaggio = `Eliminati ${contatoreAssegnazioni} assegnazioni e ${contatoreProgressi} progressi per il giocatore ${giocatore.nome}`;
+        console.log(messaggio);
+        setSuccess(messaggio);
+      } else {
+        console.log(`Nessuna assegnazione o progresso trovato per il giocatore ${giocatore.nome}`);
+      }
+      
+      return { assegnazioni: contatoreAssegnazioni, progressi: contatoreProgressi };
+    } catch (error) {
+      console.error("Errore nell'eliminazione delle assegnazioni e progressi:", error);
+      throw error;
     }
   };
 
@@ -1171,25 +1281,39 @@ export default function GestioneGiocatori() {
 
   return (
     <Layout>
-      <Box sx={{ maxWidth: "100%", overflow: "hidden" }}>
+      <Box
+        component="main"
+        sx={{
+          p: 3,
+          width: "100%",
+          maxWidth: "1200px",
+          mx: "auto", // Margini automatici a destra e sinistra per centrare
+        }}
+      >
+        {/* Pulsante grande Nuovo Giocatore a larghezza intera */}
+        {["admin", "coordinatore"].includes(currentUser?.ruolo || "") && (
+          <Button
+            variant="contained"
+            onClick={handleAddGiocatore}
+            sx={{
+              width: "100%",
+              borderRadius: 2,
+              padding: "10px",
+              mb: 2,
+              fontSize: "1rem",
+              fontWeight: "bold",
+              textTransform: "none"
+            }}
+            startIcon={<AddIcon />}
+          >
+            NUOVO GIOCATORE
+          </Button>
+        )}
+        
         {/* Header con pulsante Nuovo Giocatore e statistiche */}
-        <Box sx={{ mb: 2 }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            {["admin", "coordinatore"].includes(currentUser?.ruolo || "") && (
-              <Button
-                variant="contained"
-                onClick={handleAddGiocatore}
-                sx={{
-                  minWidth: "auto",
-                  borderRadius: 2,
-                  padding: "4px",
-                  width: "32px",
-                  height: "32px",
-                }}
-              >
-                <AddIcon />
-              </Button>
-            )}
+        <Box sx={{ mb: 1 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+            {/* Rimuovo il pulsante di aggiunta che era qui */}
 
             {/* Pulsante ricerca */}
             <IconButton
@@ -1226,13 +1350,18 @@ export default function GestioneGiocatori() {
             </Button>
 
             <Box
-              sx={{ display: "flex", alignItems: "center", gap: 1, ml: "auto" }}
+              sx={{ 
+                display: "flex", 
+                alignItems: "center", 
+                gap: 0.5, 
+                ml: "auto" 
+              }}
             >
               <Chip
                 icon={<PeopleIcon />}
                 label={giocatoriFiltrati.length}
                 size="small"
-                color={giocatoriFiltrati.length >= 30 ? "success" : "default"}
+                color="primary"
               />
 
               {/* Conteggio farm attive */}
@@ -1247,13 +1376,7 @@ export default function GestioneGiocatori() {
                     icon={<CheckCircleIcon />}
                     label={farmAttive}
                     size="small"
-                    color={
-                      farmAttive === 0
-                        ? "default"
-                        : farmAttive >= 30
-                        ? "success"
-                        : "warning"
-                    }
+                    color="success"
                   />
                 );
               })()}
@@ -1266,7 +1389,7 @@ export default function GestioneGiocatori() {
                     acc + g.farms.filter((f) => f.stato === "inattivo").length,
                   0
                 )}
-                color="default"
+                color="error"
                 size="small"
               />
             </Box>
@@ -1274,7 +1397,7 @@ export default function GestioneGiocatori() {
 
           {/* Campo di ricerca collassabile */}
           <Collapse in={searchOpen}>
-            <Box sx={{ mt: 2 }}>
+            <Box sx={{ mt: 1 }}>
               <TextField
                 fullWidth
                 value={searchQuery}
@@ -1310,154 +1433,112 @@ export default function GestioneGiocatori() {
             sx={{
               display: "flex",
               alignItems: "center",
-              justifyContent: "center",
+              justifyContent: "center", // Cambiato da space-between a center
+              flexWrap: "wrap",
+              width: "100%"
             }}
           >
-            <Button
-              startIcon={<FilterListIcon />}
-              onClick={() => setExpandedFilters(!expandedFilters)}
-              sx={{ textTransform: "none", py: 0.5 }}
-              size="small"
-            >
-              Filtri
-            </Button>
-          </Box>
-
-          {/* Pannello dei filtri collassabile */}
-          <Collapse in={expandedFilters}>
-            <Box sx={{ mt: 2 }}>
-              <Grid container spacing={2}>
-                <Grid item xs={12}>
-                  <ToggleButtonGroup
-                    value={filterMode}
-                    exclusive
-                    onChange={(e, value) => value && setFilterMode(value)}
+            <Box sx={{ 
+              display: "flex", 
+              alignItems: "center", 
+              gap: 1,
+              flexWrap: "wrap",
+              justifyContent: "center", // Aggiunto per centrare gli elementi
+              width: "auto",
+              mb: { xs: 1, sm: 0 }
+            }}>
+              {/* Pulsante toggle vista (GIOCATORI/FARM) */}
+              <IconButton 
+                onClick={() => setFilterMode(filterMode === "players" ? "farms" : "players")}
+                color="primary"
+                size="small"
+                sx={{ 
+                  p: 1,
+                  bgcolor: "action.hover",
+                  borderRadius: 1
+                }}
+              >
+                {filterMode === "players" ? <ViewModuleIcon /> : <ViewListIcon />}
+              </IconButton>
+              
+              {/* Pulsanti ordinamento per vista GIOCATORI */}
+              {filterMode === "players" && (
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                  <Button
                     size="small"
-                    fullWidth
+                    variant={sortBy === "name" ? "contained" : "outlined"}
+                    onClick={() => {
+                      if (sortBy === "name") {
+                        setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+                      } else {
+                        setSortBy("name");
+                        setSortDirection("asc");
+                      }
+                    }}
+                    endIcon={sortBy === "name" ? (
+                      sortDirection === "asc" ? <ArrowUpwardIcon fontSize="small" /> : <ArrowDownwardIcon fontSize="small" />
+                    ) : null}
+                    sx={{ textTransform: "none" }}
                   >
-                    <ToggleButton value="players">
-                      <ViewModuleIcon sx={{ mr: 1 }} />
-                      Giocatori
-                    </ToggleButton>
-                    <ToggleButton value="farms">
-                      <ViewListIcon sx={{ mr: 1 }} />
-                      Farm
-                    </ToggleButton>
-                  </ToggleButtonGroup>
-                </Grid>
-
-                {filterMode === "players" ? (
-                  <>
-                    <Grid item xs={12} sm={6}>
-                      <FormControl fullWidth>
-                        <InputLabel>Ordina per</InputLabel>
-                        <Select
-                          value={sortBy}
-                          onChange={(e) =>
-                            setSortBy(e.target.value as SortOption)
-                          }
-                          label="Ordina per"
-                        >
-                          <MenuItem value="name">Nome</MenuItem>
-                          <MenuItem value="age">Età</MenuItem>
-                          <MenuItem value="country">Paese</MenuItem>
-                          <MenuItem value="farmCount">Numero Farm</MenuItem>
-                        </Select>
-                      </FormControl>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <FormControl fullWidth>
-                        <InputLabel>Filtra per Paese</InputLabel>
-                        <Select
-                          value={filterCountry}
-                          onChange={(e) => setFilterCountry(e.target.value)}
-                          label="Filtra per Paese"
-                        >
-                          <MenuItem value="">Tutti</MenuItem>
-                          {mainCountries.map((country) => (
-                            <MenuItem
-                              key={country.code}
-                              value={country.code}
-                              sx={{ display: "flex", alignItems: "center" }}
-                            >
-                              {getCountryFlag(country.code)}
-                              {getCustomCountryName(country)} (
-                              {getCustomCountryCode(country.code)})
-                            </MenuItem>
-                          ))}
-                          <MenuItem
-                            disabled
-                            sx={{
-                              borderTop: "1px solid #ccc",
-                              my: 1,
-                              opacity: 0.7,
-                            }}
-                          >
-                            ─────────────
-                          </MenuItem>
-                          {otherCountries.map((country) => (
-                            <MenuItem
-                              key={country.code}
-                              value={country.code}
-                              sx={{ display: "flex", alignItems: "center" }}
-                            >
-                              {getCountryFlag(country.code)}
-                              {country.name} ({country.code})
-                            </MenuItem>
-                          ))}
-                        </Select>
-                      </FormControl>
-                    </Grid>
-                    <Grid item xs={12}>
-                      <Box sx={{ display: "flex", gap: 1 }}>
-                        <Button
-                          variant={
-                            sortDirection === "asc" ? "contained" : "outlined"
-                          }
-                          size="small"
-                          onClick={() => setSortDirection("asc")}
-                          sx={{ textTransform: "none" }}
-                        >
-                          Crescente
-                        </Button>
-                        <Button
-                          variant={
-                            sortDirection === "desc" ? "contained" : "outlined"
-                          }
-                          size="small"
-                          onClick={() => setSortDirection("desc")}
-                          sx={{ textTransform: "none" }}
-                        >
-                          Decrescente
-                        </Button>
-                      </Box>
-                    </Grid>
-                  </>
-                ) : (
-                  <>
-                    <Grid item xs={12}>
-                      <FormControl fullWidth>
-                        <InputLabel>Stato Farm</InputLabel>
-                        <Select
-                          value={filterFarmStatus}
-                          onChange={(e) =>
-                            setFilterFarmStatus(
-                              e.target.value as "all" | "active" | "inactive"
-                            )
-                          }
-                          label="Stato Farm"
-                        >
-                          <MenuItem value="all">Tutte</MenuItem>
-                          <MenuItem value="active">Solo Attive</MenuItem>
-                          <MenuItem value="inactive">Solo Inattive</MenuItem>
-                        </Select>
-                      </FormControl>
-                    </Grid>
-                  </>
-                )}
-              </Grid>
+                    Nome
+                  </Button>
+                  
+                  <Button
+                    size="small"
+                    variant={sortBy === "farmCount" ? "contained" : "outlined"}
+                    onClick={() => {
+                      if (sortBy === "farmCount") {
+                        setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+                      } else {
+                        setSortBy("farmCount");
+                        setSortDirection("asc");
+                      }
+                    }}
+                    endIcon={sortBy === "farmCount" ? (
+                      sortDirection === "asc" ? <ArrowUpwardIcon fontSize="small" /> : <ArrowDownwardIcon fontSize="small" />
+                    ) : null}
+                    sx={{ textTransform: "none" }}
+                  >
+                    Farm
+                  </Button>
+                  
+                  <Button
+                    size="small"
+                    variant={sortBy === "country" ? "contained" : "outlined"}
+                    onClick={() => {
+                      if (sortBy === "country") {
+                        setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+                      } else {
+                        setSortBy("country");
+                        setSortDirection("asc");
+                      }
+                    }}
+                    endIcon={sortBy === "country" ? (
+                      sortDirection === "asc" ? <ArrowUpwardIcon fontSize="small" /> : <ArrowDownwardIcon fontSize="small" />
+                    ) : null}
+                    sx={{ textTransform: "none" }}
+                  >
+                    Paese
+                  </Button>
+                </Box>
+              )}
+              
+              {/* Switch per filtro farm attive/inattive nella vista FARM */}
+              {filterMode === "farms" && (
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={filterFarmStatus === "active"}
+                      onChange={(e) => setFilterFarmStatus(e.target.checked ? "active" : "all")}
+                      size="small"
+                    />
+                  }
+                  label="Solo farm attive"
+                  sx={{ ml: 1 }}
+                />
+              )}
             </Box>
-          </Collapse>
+          </Box>
         </Paper>
 
         {/* Header con statistiche */}
@@ -1481,7 +1562,7 @@ export default function GestioneGiocatori() {
               display: "flex",
               flexDirection: "column",
               gap: 0.5,
-              maxWidth: "100%",
+              width: "100%",
             }}
           >
             {giocatoriFiltrati.map((giocatore, index) => {
@@ -1511,8 +1592,8 @@ export default function GestioneGiocatori() {
                     sx={{
                       overflow: "hidden",
                       transition: "all 0.3s ease",
-                      borderBottom: "1px solid",
-                      borderColor: "divider",
+                      borderRadius: "8px",
+                      mb: 0.5,
                       bgcolor: !hasActiveFarms
                         ? "action.hover"
                         : "rgba(227, 242, 253, 0.7)",
@@ -1527,21 +1608,22 @@ export default function GestioneGiocatori() {
                     <Box
                       onClick={() => handleExpand(giocatore.id)}
                       sx={{
-                        p: 1.5,
+                        px: 1.5,
+                        py: 0.75,
                         display: "flex",
                         alignItems: "center",
-                        gap: 2,
                         cursor: "pointer",
-                        flexWrap: { xs: "wrap", sm: "nowrap" },
+                        width: "100%",
                       }}
                     >
-                      {/* Prima riga: numero, avatar e nome */}
+                      {/* Prima colonna: numero e nome */}
                       <Box
                         sx={{
                           display: "flex",
                           alignItems: "center",
-                          gap: 2,
+                          gap: 0.75,
                           flexGrow: 1,
+                          overflow: "hidden",
                           minWidth: 0,
                         }}
                       >
@@ -1549,20 +1631,23 @@ export default function GestioneGiocatori() {
                           variant="body2"
                           color="text.secondary"
                           sx={{
-                            minWidth: "20px",
+                            minWidth: "18px",
                             textAlign: "right",
+                            fontSize: "0.8rem"
                           }}
                         >
-                          {index + 1}
+                          {index + 1}.
                         </Typography>
-                        <Box sx={{ display: "flex", flexDirection: "column" }}>
+                        <Box sx={{ display: "flex", flexDirection: "column", minWidth: 0, flexGrow: 1 }}>
                           <Typography
                             variant="subtitle1"
                             sx={{
-                              fontWeight: "bold",
+                              fontWeight: "medium",
                               overflow: "hidden",
                               textOverflow: "ellipsis",
                               whiteSpace: "nowrap",
+                              fontSize: "0.9rem",
+                              lineHeight: 1.2
                             }}
                           >
                             {giocatore.nome}
@@ -1575,9 +1660,8 @@ export default function GestioneGiocatori() {
                               sx={{
                                 fontStyle: "italic",
                                 color: "text.secondary",
-                                fontSize: "0.7rem",
+                                fontSize: "0.65rem",
                                 lineHeight: 1,
-                                mt: -0.5,
                               }}
                             >
                               {giocatore.ruolo.charAt(0).toUpperCase() +
@@ -1587,13 +1671,14 @@ export default function GestioneGiocatori() {
                         </Box>
                       </Box>
 
-                      {/* Seconda colonna: chips e info */}
+                      {/* Colonna centrale: chips e info */}
                       <Box
                         sx={{
                           display: "flex",
                           alignItems: "center",
-                          gap: 1,
+                          gap: 0.5,
                           flexShrink: 0,
+                          mr: 0.75,
                         }}
                       >
                         {/* Farm status */}
@@ -1603,30 +1688,14 @@ export default function GestioneGiocatori() {
                               .length
                           }/${giocatore.farms.length}`}
                           size="small"
-                          color={
-                            giocatore.farms.every((f) => f.stato === "attivo")
-                              ? "primary"
-                              : giocatore.farms.some(
-                                  (f) => f.stato === "attivo"
-                                )
-                              ? "warning"
-                              : "default"
-                          }
+                          color="default"
                           sx={{
-                            height: 24,
-                            bgcolor: giocatore.farms.every(
-                              (f) => f.stato === "attivo"
-                            )
-                              ? "primary.main"
-                              : giocatore.farms.some(
-                                  (f) => f.stato === "attivo"
-                                )
-                              ? "rgba(237, 108, 2, 0.7)"
-                              : undefined,
+                            height: 18,
+                            fontSize: "0.7rem",
                           }}
                         />
 
-                        {/* Info Button */}
+                        {/* Info Button - compattato */}
                         {(giocatore.note ||
                           giocatore.contatto ||
                           giocatore.eta ||
@@ -1642,47 +1711,41 @@ export default function GestioneGiocatori() {
                                 ? "primary"
                                 : "default"
                             }
-                            sx={{ p: 0.5 }}
+                            sx={{ p: 0.2 }}
                           >
-                            <InfoIcon fontSize="small" />
+                            <InfoIcon sx={{ fontSize: 18 }} />
                           </IconButton>
                         )}
 
                         {/* Nazionalità - solo bandiera */}
                         {giocatore.nazionalita && (
-                          <Box sx={{ display: "flex", alignItems: "center" }}>
+                          <Box sx={{ height: 16, display: "flex", alignItems: "center" }}>
                             {getCountryFlag(giocatore.nazionalita)}
                           </Box>
                         )}
                       </Box>
 
-                      {/* Terza colonna: azioni */}
+                      {/* Colonna destra: azioni */}
                       <Box
                         sx={{
                           display: "flex",
                           alignItems: "center",
-                          gap: 1,
-                          ml: "auto",
+                          gap: 0.25,
+                          flexShrink: 0,
                         }}
                       >
                         {(canEditGiocatore(giocatore) ||
                           currentUser?.pin === giocatore.pin) && (
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 0.5,
-                            }}
-                          >
+                          <>
                             <IconButton
                               size="small"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleCopyPin(giocatore.pin);
                               }}
-                              sx={{ p: 0.5 }}
+                              sx={{ p: 0.2 }}
                             >
-                              <ContentCopyIcon fontSize="small" />
+                              <ContentCopyIcon sx={{ fontSize: 18 }} />
                             </IconButton>
                             <IconButton
                               size="small"
@@ -1690,11 +1753,13 @@ export default function GestioneGiocatori() {
                                 e.stopPropagation();
                                 handleOpenMenu(e, giocatore);
                               }}
+                              sx={{ p: 0.2 }}
                             >
-                              <MoreVertIcon fontSize="small" />
+                              <MoreVertIcon sx={{ fontSize: 18 }} />
                             </IconButton>
-                          </Box>
+                          </>
                         )}
+                        {/* Rimuovo la freccia espandi/collassa, il click sulla riga espande già */}
                       </Box>
                     </Box>
 
@@ -1709,533 +1774,316 @@ export default function GestioneGiocatori() {
                       >
                         <Box
                           sx={{
-                            p: 1.5,
+                            p: 1.25,
                             borderRadius: 1,
                             bgcolor: "action.hover",
                             color: "text.secondary",
-                            fontSize: "0.875rem",
+                            fontSize: "0.8rem",
                             whiteSpace: "pre-wrap",
-                            mx: 2,
+                            mx: 1.5,
+                            mb: 1,
                             display: "flex",
                             flexDirection: "column",
-                            gap: 1,
+                            gap: 0.75,
                           }}
                         >
-                          {/* Avatar */}
-                          <Box
-                            sx={{
-                              display: "flex",
-                              justifyContent: "center",
-                              mb: 1,
-                            }}
-                          >
-                            <Avatar
-                              src={giocatore.immagine || undefined}
-                              sx={{ width: 80, height: 80 }}
-                            >
-                              {giocatore.nome.charAt(0).toUpperCase()}
-                            </Avatar>
-                          </Box>
-
-                          {/* PIN */}
-                          {(canEditGiocatore(giocatore) ||
-                            currentUser?.pin === giocatore.pin) && (
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 1,
+                          {/* Contenuto presentazione */}
+                          {/* Immagine del profilo */}
+                          {giocatore.immagine && (
+                            <Box 
+                              sx={{ 
+                                width: "100%", 
+                                display: "flex", 
+                                justifyContent: "center", 
+                                mb: 1 
                               }}
                             >
-                              <Typography
-                                variant="subtitle2"
-                                color="text.primary"
-                              >
-                                PIN:
-                              </Typography>
-                              <Typography
-                                onClick={() => handleCopyPin(giocatore.pin)}
-                                sx={{
-                                  cursor: "pointer",
-                                  "&:hover": {
-                                    color: "primary.main",
-                                    textDecoration: "underline",
-                                  },
+                              <Avatar 
+                                src={giocatore.immagine} 
+                                alt={giocatore.nome}
+                                sx={{ 
+                                  width: 80, 
+                                  height: 80,
+                                  border: "2px solid white"
                                 }}
-                              >
-                                {giocatore.pin}
-                              </Typography>
-                            </Box>
-                          )}
-
-                          {/* Nazionalità nel box espandibile */}
-                          {giocatore.nazionalita && (
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 1,
-                              }}
-                            >
-                              <Typography
-                                variant="subtitle2"
-                                color="text.primary"
-                              >
-                                Nazionalità:
-                              </Typography>
-                              <Box
-                                sx={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 1,
-                                }}
-                              >
-                                {getCountryFlag(giocatore.nazionalita)}
-                                <Typography>
-                                  {getCustomCountryName({
-                                    code: giocatore.nazionalita,
-                                    name: getCountryName(giocatore.nazionalita),
-                                  })}{" "}
-                                  ({getCustomCountryCode(giocatore.nazionalita)}
-                                  )
-                                </Typography>
-                              </Box>
-                            </Box>
-                          )}
-
-                          {/* Età */}
-                          {giocatore.eta && (
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 1,
-                              }}
-                            >
-                              <Typography
-                                variant="subtitle2"
-                                color="text.primary"
-                              >
-                                Età:
-                              </Typography>
-                              <Chip
-                                label={`${giocatore.eta} anni`}
-                                size="small"
-                                color="default"
-                                sx={{ height: 24 }}
                               />
                             </Box>
                           )}
 
-                          {/* Contatto */}
-                          {giocatore.contatto &&
-                            (currentUser?.ruolo === "admin" ||
-                              currentUser?.pin === giocatore.pin ||
-                              giocatore.contattoVisibile) && (
-                              <Box
-                                sx={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 1,
+                          {giocatore.contatto && canViewFullDetails(giocatore) && (
+                            <Box>
+                              <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                                Contatto:
+                              </Typography>{" "}
+                              <Box 
+                                component="span" 
+                                onClick={() => {
+                                  navigator.clipboard.writeText(giocatore.contatto || "");
+                                  setSuccess("Contatto copiato negli appunti!");
+                                }}
+                                sx={{ 
+                                  cursor: 'pointer',
+                                  '&:hover': {
+                                    color: 'primary.main',
+                                    textDecoration: 'underline'
+                                  }
                                 }}
                               >
-                                <Typography
-                                  variant="subtitle2"
-                                  color="text.primary"
-                                >
-                                  Contatto:
-                                </Typography>
-                                <Typography
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(
-                                      giocatore.contatto || ""
-                                    );
-                                    setSuccess(
-                                      "Contatto copiato negli appunti!"
-                                    );
-                                  }}
-                                  sx={{
-                                    cursor: "pointer",
-                                    "&:hover": {
-                                      color: "primary.main",
-                                      textDecoration: "underline",
-                                    },
-                                  }}
-                                >
-                                  {giocatore.contatto}
-                                </Typography>
-                                {!giocatore.contattoVisibile &&
-                                  currentUser?.ruolo !== "admin" &&
-                                  currentUser?.pin === giocatore.pin && (
-                                    <Typography
-                                      variant="caption"
-                                      color="text.secondary"
-                                      sx={{ ml: 1 }}
-                                    >
-                                      (Visibile solo a te)
-                                    </Typography>
-                                  )}
+                                {giocatore.contatto}
                               </Box>
-                            )}
+                              {giocatore.contattoVisibile && (
+                                <Chip
+                                  label="Visibile"
+                                  size="small"
+                                  color="primary"
+                                  variant="outlined"
+                                  sx={{ ml: 1, height: 16, fontSize: '0.65rem' }}
+                                />
+                              )}
+                            </Box>
+                          )}
 
-                          {/* Note */}
-                          {giocatore.note && (
-                            <Box sx={{ mt: 1 }}>
-                              <Typography
-                                variant="subtitle2"
-                                color="text.primary"
-                                sx={{ mb: 0.5 }}
-                              >
+                          {giocatore.eta && (
+                            <Box>
+                              <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                                Età:
+                              </Typography>{" "}
+                              {giocatore.eta} anni
+                            </Box>
+                          )}
+
+                          {giocatore.nazionalita && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                              <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                                Nazionalità:
+                              </Typography>{" "}
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                {getCountryFlag(giocatore.nazionalita)}
+                                {getCustomCountryName({ 
+                                  code: giocatore.nazionalita, 
+                                  name: countries.find(c => c.code === giocatore.nazionalita)?.name || giocatore.nazionalita 
+                                })}
+                              </Box>
+                            </Box>
+                          )}
+
+                          {giocatore.note && canViewFullDetails(giocatore) && (
+                            <Box>
+                              <Typography variant="caption" sx={{ fontWeight: 600 }}>
                                 Note:
                               </Typography>
-                              <Typography>{giocatore.note}</Typography>
+                              <Box sx={{ mt: 0.5 }}>{giocatore.note}</Box>
+                            </Box>
+                          )}
+
+                          {/* PIN - solo admin, coordinatore, moderatore oppure utente stesso */}
+                          {canViewFullDetails(giocatore) && (
+                            <Box>
+                              <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                                PIN:
+                              </Typography>{" "}
+                              <Box 
+                                component="span" 
+                                onClick={() => handleCopyPin(giocatore.pin)}
+                                sx={{ 
+                                  cursor: 'pointer',
+                                  fontFamily: 'monospace',
+                                  '&:hover': {
+                                    color: 'primary.main',
+                                    textDecoration: 'underline'
+                                  }
+                                }}
+                              >
+                                {giocatore.pin}
+                              </Box>
                             </Box>
                           )}
                         </Box>
                       </Collapse>
                     )}
 
-                    {/* Contenuto espandibile con le farm */}
-                    <Box
-                      sx={{
-                        maxHeight: expandedPlayers.includes(giocatore.id)
-                          ? "1000px"
-                          : "0px",
-                        transition: "max-height 0.3s ease-in-out",
-                        overflow: "hidden",
-                      }}
-                    >
-                      <Box sx={{ px: 2, pb: 2, bgcolor: "background.paper" }}>
-                        {mostraFarms.map((farm, farmIndex) => (
-                          <Paper
-                            key={farmIndex}
-                            sx={{
-                              p: 1,
-                              bgcolor:
-                                farm.stato === "attivo"
-                                  ? "#ffffff"
-                                  : "action.disabledBackground",
-                              position: "relative",
-                              borderRadius: 0,
-                              mb: 0,
-                              border: "1px solid",
-                              borderColor: "divider",
-                              boxShadow: "none",
-                              "&:hover": {
-                                bgcolor:
-                                  farm.stato === "attivo"
-                                    ? "rgba(255, 255, 255, 0.9)"
-                                    : "action.disabledBackground",
-                              },
-                            }}
-                          >
-                            <Box
+                    {/* Lista delle farms espandibile */}
+                    <Collapse in={expandedPlayers.includes(giocatore.id)}>
+                      <Box sx={{ px: 1.5, pb: 1.25 }}>
+                        <List disablePadding dense sx={{ mt: 0 }}>
+                          {mostraFarms.map((farm, farmIndex) => (
+                            <React.Fragment key={farmIndex}>
+                              <ListItem 
+                                disablePadding 
                               sx={{
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: 1,
-                              }}
-                            >
-                              {/* Nome farm e corona */}
+                                  py: 0.25, 
+                                  bgcolor: farm.stato === "inattivo" ? "rgba(0,0,0,0.03)" : "transparent",
+                                  borderRadius: "4px",
+                                }}
+                              >
+                                <Box sx={{ display: "flex", alignItems: "center", width: "100%" }}>
                               <Box
                                 sx={{
                                   display: "flex",
                                   alignItems: "center",
-                                  justifyContent: "space-between",
-                                  width: "100%",
-                                }}
-                              >
-                                <Box
-                                  sx={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 1,
-                                  }}
-                                >
-                                  <Typography
-                                    variant="subtitle1"
-                                    sx={{ fontWeight: "bold" }}
-                                  >
-                                    {farm.nome}
-                                    {farm.principale && (
-                                      <Typography
-                                        component="span"
-                                        sx={{ ml: 1 }}
-                                      >
-                                        👑
-                                      </Typography>
-                                    )}
-                                  </Typography>
-                                </Box>
-
-                                {/* Sposto il livello e lo stato sulla destra */}
-                                <Box
-                                  sx={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 2,
-                                  }}
-                                >
-                                  <Chip
-                                    size="small"
-                                    label={
-                                      farm.stato === "attivo"
-                                        ? "Attiva"
-                                        : "Inattiva"
-                                    }
-                                    color={
-                                      farm.stato === "attivo"
-                                        ? "success"
-                                        : "default"
-                                    }
-                                    icon={
-                                      <CircleIcon
-                                        sx={{ fontSize: "12px !important" }}
-                                      />
-                                    }
-                                    sx={{
-                                      height: 20,
-                                      cursor:
-                                        currentUser?.ruolo === "admin" ||
-                                        currentUser?.ruolo === "coordinatore" ||
-                                        currentUser?.id === giocatore.id
-                                          ? "pointer"
-                                          : "default",
-                                    }}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      // Permetti la modifica solo a admin, coordinatori o al proprietario
-                                      if (
-                                        currentUser?.ruolo === "admin" ||
-                                        currentUser?.ruolo === "coordinatore" ||
-                                        currentUser?.id === giocatore.id
-                                      ) {
-                                        handleToggleFarmStatus(
-                                          giocatore,
-                                          farmIndex
-                                        );
-                                      }
-                                    }}
-                                  />
-                                  <Box
-                                    sx={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      bgcolor: "grey.200",
-                                      borderRadius: 1,
-                                      px: 1,
-                                      py: 0.5,
-                                      gap: 0.5,
-                                      minWidth: "80px",
-                                      justifyContent: "center",
+                                      flexGrow: 1,
+                                      overflow: "hidden"
                                     }}
                                   >
-                                    <Typography
-                                      variant="body2"
-                                      sx={{
-                                        width: "36px",
-                                        textAlign: "center",
+                                    {/* Nome farm */}
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                        flexGrow: 1,
+                                        overflow: "hidden"
                                       }}
                                     >
-                                      {farm.livello}
+                                      {/* Icona copia tag e Nome farm */}
+                                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, overflow: "hidden" }}>
+                                        <IconButton
+                                size="small"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (farm.tag) {
+                                              handleCopy(farm.tag);
+                                            }
+                                          }}
+                                          disabled={!farm.tag}
+                                sx={{
+                                            p: 0,
+                                            width: 16,
+                                            height: 16,
+                                            opacity: farm.tag ? 1 : 0.4,
+                                            color: farm.tag ? "primary.main" : "text.disabled"
+                                          }}
+                                        >
+                                          <ContentCopyIcon fontSize="inherit" />
+                                        </IconButton>
+                                <Typography
+                                  sx={{
+                                            flexGrow: 1, 
+                                            fontWeight: farm.principale ? 600 : 400,
+                                            color: farm.stato === "inattivo" ? "text.disabled" : "text.primary",
+                                            overflow: "hidden",
+                                            textOverflow: "ellipsis",
+                                            whiteSpace: "nowrap",
+                                            fontSize: "0.85rem",
+                                          }}
+                                        >
+                                          {farm.nome}
+                                </Typography>
+                              </Box>
+                            </Box>
+                        </Box>
+                                  
+                                  {/* Informazioni farm */}
+                              <Box 
+                                sx={{ 
+                                  display: "flex", 
+                                  alignItems: "center", 
+                                  gap: 0.75, 
+                                  ml: 1,
+                                  flexShrink: 0
+                                }}
+                              >
+                                {/* Diamanti prima del livello */}
+                                <Box 
+                                  sx={{ 
+                                    display: "flex", 
+                                    alignItems: "center", 
+                                    gap: 0.5,
+                                    color: farm.stato === "inattivo" ? "text.disabled" : "text.secondary",
+                                  }}
+                                >
+                                  {/* Prima mostro i diamanti */}
+                                  {farm.diamanti !== undefined && (
+                                    <Typography
+                                      sx={{ 
+                                        display: "flex", 
+                                        alignItems: "center", 
+                                        fontSize: "0.75rem",
+                                      }}
+                                    >
+                                      💎{farm.diamanti}
                                     </Typography>
+                                  )}
+                                  
+                                  {/* Poi mostro il livello e pulsante + */}
+                                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.25, ml: 0.5 }}>
                                     <img
                                       src="/images/livello.png"
                                       alt="Livello"
                                       style={{
-                                        width: "16px",
-                                        height: "16px",
-                                        objectFit: "contain",
+                                        width: "12px",
+                                        height: "12px",
+                                        marginRight: "2px",
                                       }}
                                     />
-                                    {(currentUser?.ruolo === "admin" ||
-                                      currentUser?.ruolo === "coordinatore" ||
-                                      currentUser?.pin === giocatore.pin) && (
+                                    <Typography sx={{ fontSize: "0.75rem" }}>
+                                      {farm.livello}
+                                    </Typography>
+                                    
+                                    {/* Pulsante + */}
+                                    {canEditGiocatore(giocatore) && (
                                       <IconButton
                                         size="small"
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           if (farm.livello < 999) {
-                                            handleUpdateFarmLevel(
-                                              giocatore,
-                                              farmIndex
-                                            );
+                                            handleUpdateFarmLevel(giocatore, farmIndex);
                                           } else {
-                                            setError(
-                                              "Il livello massimo è 999"
-                                            );
+                                            setError("Il livello massimo è 999");
                                           }
                                         }}
                                         sx={{
-                                          ml: 0.5,
+                                          p: 0,
+                                          ml: 0.25,
+                                          width: 14,
+                                          height: 14,
                                           bgcolor: "primary.main",
                                           color: "white",
                                           "&:hover": {
                                             bgcolor: "primary.dark",
                                           },
-                                          width: 20,
-                                          height: 20,
                                           "& .MuiSvgIcon-root": {
-                                            fontSize: 16,
-                                          },
+                                            fontSize: 10
+                                          }
                                         }}
                                       >
-                                        <AddIcon />
+                                        <AddIcon fontSize="inherit" />
                                       </IconButton>
                                     )}
                                   </Box>
                                 </Box>
-                              </Box>
-
-                              {/* Tag con funzione copia */}
-                              {(farm.tag || farm.diamanti) && (
-                                <Box
-                                  sx={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 1,
-                                  }}
-                                >
-                                  {farm.tag && (
-                                    <>
-                                      <Box
-                                        onClick={() => {
-                                          navigator.clipboard.writeText(
-                                            getCleanTag(farm.tag!)
-                                          );
-                                          setSuccess(
-                                            "Tag copiato negli appunti!"
-                                          );
-                                        }}
-                                        sx={{
-                                          cursor: "pointer",
-                                          bgcolor: "action.hover",
-                                          px: 1,
-                                          py: 0.5,
-                                          borderRadius: 1,
-                                          display: "flex",
-                                          alignItems: "center",
-                                          gap: 1,
-                                          width: "fit-content",
-                                          "&:hover": {
-                                            bgcolor: "action.selected",
-                                          },
-                                        }}
-                                      >
-                                        <Typography
-                                          variant="body2"
-                                          sx={{
-                                            fontFamily: "monospace",
-                                          }}
-                                        >
-                                          {farm.tag}
-                                        </Typography>
-                                      </Box>
-                                    </>
-                                  )}
-                                  {farm.diamanti && (
-                                    <Typography
-                                      variant="body1"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        const newValue = prompt(
-                                          "Inserisci il nuovo valore dei diamanti:",
-                                          farm.diamanti?.toString()
-                                        );
-                                        if (newValue !== null) {
-                                          const numValue = parseInt(newValue);
-                                          if (
-                                            !isNaN(numValue) &&
-                                            numValue >= 0
-                                          ) {
-                                            const farmsAggiornate = [
-                                              ...giocatore.farms,
-                                            ];
-                                            farmsAggiornate[farmIndex] = {
-                                              ...farmsAggiornate[farmIndex],
-                                              diamanti: numValue,
-                                            };
-
-                                            setDoc(
-                                              doc(db, "utenti", giocatore.id),
-                                              {
-                                                ...giocatore,
-                                                farms: farmsAggiornate,
-                                              }
-                                            )
-                                              .then(() => {
-                                                setSuccess(
-                                                  "Diamanti aggiornati con successo!"
-                                                );
-                                              })
-                                              .catch((error) => {
-                                                console.error(
-                                                  "Errore nell'aggiornamento dei diamanti:",
-                                                  error
-                                                );
-                                                setError(
-                                                  "Errore nell'aggiornamento dei diamanti"
-                                                );
-                                              });
-                                          } else {
-                                            setError(
-                                              "Inserisci un numero valido maggiore o uguale a 0"
-                                            );
-                                          }
-                                        }
-                                      }}
-                                      sx={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: 0.5,
-                                        cursor: "pointer",
-                                        "&:hover": {
-                                          color: "primary.main",
-                                          textDecoration: "underline",
+                                
+                                {/* Toggle stato - switch stile mobile piccolo */}
+                                {canEditGiocatore(giocatore) && (
+                                  <Switch
+                                    checked={farm.stato === "attivo"}
+                                    onChange={(e) => {
+                                      e.stopPropagation();
+                                      handleToggleFarmStatus(giocatore, farmIndex);
+                                    }}
+                                    size="small"
+                                    sx={{
+                                      ml: 0.5,
+                                      '& .MuiSwitch-switchBase.Mui-checked': {
+                                        color: '#fff',
+                                        '& + .MuiSwitch-track': {
+                                          backgroundColor: 'success.main',
+                                          opacity: 1,
                                         },
-                                      }}
-                                    >
-                                      💎 {farm.diamanti}
-                                    </Typography>
-                                  )}
-                                </Box>
-                              )}
-
-                              {/* Derby Tags */}
-                              <Box
-                                sx={{
-                                  display: "flex",
-                                  gap: 0.5,
-                                  mt: 0.5,
-                                  flexWrap: "wrap",
-                                }}
-                              >
-                                {farm.derby_tags?.map((tagId) => {
-                                  const derbyInfo = derby.find(
-                                    (d) => d.id === tagId
-                                  );
-                                  if (!derbyInfo) return null;
-                                  return (
-                                    <Chip
-                                      key={tagId}
-                                      label={derbyInfo.nome}
-                                      size="small"
-                                      sx={{
-                                        height: 16,
-                                        fontSize: "0.625rem",
-                                        bgcolor: derbyInfo.colore || "#666",
-                                        color: "white",
-                                        "& .MuiChip-label": { px: 1 },
-                                      }}
-                                    />
-                                  );
-                                })}
+                                      },
+                                      '& .MuiSwitch-track': {
+                                        backgroundColor: 'grey.400',
+                                      }
+                                    }}
+                                  />
+                                )}
                               </Box>
                             </Box>
-                          </Paper>
+                              </ListItem>
+                            </React.Fragment>
                         ))}
+                        </List>
                       </Box>
-                    </Box>
+                    </Collapse>
                   </Paper>
                 </React.Fragment>
               );
@@ -2243,8 +2091,14 @@ export default function GestioneGiocatori() {
           </Box>
         ) : (
           // Vista Farm (tabella)
-          <TableContainer component={Paper}>
-            <Table>
+          <TableContainer 
+            component={Paper}
+            sx={{
+              width: "100%",
+              overflowX: "auto"
+            }}
+          >
+            <Table size="small">
               <TableHead>
                 <TableRow>
                   <TableCell
@@ -2252,6 +2106,7 @@ export default function GestioneGiocatori() {
                     sx={{
                       cursor: "pointer",
                       "&:hover": { bgcolor: "action.hover" },
+                      whiteSpace: "nowrap"
                     }}
                   >
                     <Box
@@ -2266,6 +2121,7 @@ export default function GestioneGiocatori() {
                     sx={{
                       cursor: "pointer",
                       "&:hover": { bgcolor: "action.hover" },
+                      whiteSpace: "nowrap"
                     }}
                   >
                     <Box
@@ -2281,6 +2137,7 @@ export default function GestioneGiocatori() {
                     sx={{
                       cursor: "pointer",
                       "&:hover": { bgcolor: "action.hover" },
+                      whiteSpace: "nowrap"
                     }}
                   >
                     <Box
@@ -2309,6 +2166,7 @@ export default function GestioneGiocatori() {
                     sx={{
                       cursor: "pointer",
                       "&:hover": { bgcolor: "action.hover" },
+                      whiteSpace: "nowrap"
                     }}
                   >
                     <Box
@@ -2328,6 +2186,7 @@ export default function GestioneGiocatori() {
                     sx={{
                       cursor: "pointer",
                       "&:hover": { bgcolor: "action.hover" },
+                      whiteSpace: "nowrap"
                     }}
                   >
                     <Box
@@ -2343,7 +2202,13 @@ export default function GestioneGiocatori() {
                 {filteredItems.map((farm, index) => (
                   <TableRow
                     key={`${farm.playerId}-${farm.farmName}`}
-                    sx={{ "&:nth-of-type(odd)": { bgcolor: "action.hover" } }}
+                    sx={{ 
+                      "&:nth-of-type(odd)": { bgcolor: "action.hover" },
+                      "& .MuiTableCell-root": {
+                        py: 0.75,
+                        px: 1
+                      }
+                    }}
                   >
                     <TableCell component="th" scope="row">
                       <Typography
@@ -2415,7 +2280,7 @@ export default function GestioneGiocatori() {
                     <TableCell>
                       <Chip
                         label={farm.status === "attivo" ? "Attiva" : "Inattiva"}
-                        color={farm.status === "attivo" ? "success" : "default"}
+                        color="default"
                         size="small"
                       />
                     </TableCell>
@@ -2435,8 +2300,47 @@ export default function GestioneGiocatori() {
           <DialogTitle>
             {editingGiocatore ? "Modifica Giocatore" : "Nuovo Giocatore"}
           </DialogTitle>
-          <DialogContent>
-            <Grid container spacing={2} sx={{ mt: 1 }}>
+          <DialogContent sx={{ px: { xs: 1, sm: 3 } }}>
+            <Paper
+              elevation={0}
+              variant="outlined"
+              sx={{ 
+                mb: 2, 
+                mt: 1,
+                borderRadius: '8px',
+                overflow: 'hidden'
+              }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  py: 1,
+                  px: 2,
+                  cursor: "pointer",
+                  bgcolor: 'background.paper'
+                }}
+                onClick={() => {
+                  setFormData({
+                    ...formData,
+                    expandedPersonalInfo: !formData.expandedPersonalInfo,
+                  });
+                }}
+              >
+                <Typography sx={{ fontWeight: 'medium', fontSize: '0.95rem' }}>
+                  Dati Personali
+                </Typography>
+                {formData.expandedPersonalInfo ? (
+                  <ExpandLessIcon fontSize="small" color="primary" />
+                ) : (
+                  <ExpandMoreIcon fontSize="small" color="primary" />
+                )}
+              </Box>
+
+              <Collapse in={formData.expandedPersonalInfo}>
+                <Box sx={{ p: 2, pt: 1, bgcolor: 'background.paper' }}>
+                  <Grid container spacing={1}>
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
@@ -2451,10 +2355,11 @@ export default function GestioneGiocatori() {
                         ({ pin: "", ruolo: "giocatore" } as Giocatore)
                     )
                   }
+                        size="small"
+                        margin="dense"
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
-                <Box sx={{ display: "flex", gap: 1 }}>
                   <TextField
                     fullWidth
                     label="PIN"
@@ -2465,12 +2370,13 @@ export default function GestioneGiocatori() {
                         setFormData({ ...formData, pin: parseInt(value) || 0 });
                       }
                     }}
-                    disabled={!currentUser?.ruolo === "admin"}
+                        disabled={currentUser?.ruolo !== "admin"}
                     InputProps={{ inputProps: { min: 0, max: 999999 } }}
+                        size="small"
+                        margin="dense"
                   />
-                </Box>
               </Grid>
-              <Grid item xs={12} sm={6}>
+                    <Grid item xs={6} sm={3}>
                 <TextField
                   fullWidth
                   label="Età"
@@ -2480,14 +2386,16 @@ export default function GestioneGiocatori() {
                     const value = parseInt(e.target.value);
                     setFormData({
                       ...formData,
-                      eta: !isNaN(value) ? value.toString() : undefined,
+                            eta: !isNaN(value) ? value.toString() : "",
                     });
                   }}
                   InputProps={{ inputProps: { min: 0, max: 150 } }}
+                        size="small"
+                        margin="dense"
                 />
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth>
+                    <Grid item xs={6} sm={9}>
+                      <FormControl fullWidth size="small" margin="dense">
                   <InputLabel>Nazionalità</InputLabel>
                   <Select
                     value={formData.nazionalita || ""}
@@ -2496,7 +2404,7 @@ export default function GestioneGiocatori() {
                     }
                     label="Nazionalità"
                   >
-                    <MenuItem value="">Tutti</MenuItem>
+                          <MenuItem value="">Nessuna</MenuItem>
                     {mainCountries.map((country) => (
                       <MenuItem
                         key={country.code}
@@ -2528,7 +2436,7 @@ export default function GestioneGiocatori() {
                 </FormControl>
               </Grid>
               <Grid item xs={12}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <TextField
                     fullWidth
                     label="Contatto"
@@ -2536,10 +2444,13 @@ export default function GestioneGiocatori() {
                     onChange={(e) =>
                       setFormData({ ...formData, contatto: e.target.value })
                     }
+                          size="small"
+                          margin="dense"
                   />
                   <FormControlLabel
                     control={
                       <Switch
+                              size="small"
                         checked={formData.contattoVisibile}
                         onChange={(e) =>
                           setFormData({
@@ -2549,7 +2460,11 @@ export default function GestioneGiocatori() {
                         }
                       />
                     }
-                    label="Mostra agli altri"
+                          label={
+                            <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
+                              Visibile
+                            </Typography>
+                          }
                   />
                 </Box>
               </Grid>
@@ -2563,10 +2478,12 @@ export default function GestioneGiocatori() {
                   onChange={(e) =>
                     setFormData({ ...formData, note: e.target.value })
                   }
+                        size="small"
+                        margin="dense"
                 />
               </Grid>
               <Grid item xs={12}>
-                <Typography variant="subtitle1">Immagine Profilo</Typography>
+                      <Typography variant="body2" sx={{ mb: 1 }}>Immagine Profilo</Typography>
                 <UploadImmagine
                   cartella="giocatori"
                   id={editingGiocatore?.id || "nuovo"}
@@ -2577,44 +2494,124 @@ export default function GestioneGiocatori() {
                   onImmagineEliminata={() =>
                     setFormData({ ...formData, immagine: "" })
                   }
-                  dimensione={150}
+                        dimensione={120}
                 />
               </Grid>
+                  </Grid>
+                </Box>
+              </Collapse>
+            </Paper>
 
-              {/* Farm Section */}
-              {formData.farms.map((farm, index) => (
-                <Grid item xs={12} key={index}>
-                  <Card variant="outlined">
-                    <CardContent>
-                      <Grid container spacing={2}>
-                        <Grid item xs={12}>
-                          <Typography variant="h6">
-                            Farm {index + 1}
-                            <FormControlLabel
-                              control={
-                                <Switch
-                                  checked={farm.principale}
-                                  onChange={(e) => {
-                                    const newFarms = formData.farms.map(
-                                      (f, i) => ({
-                                        ...f,
-                                        principale:
-                                          i === index
-                                            ? e.target.checked
-                                            : false,
-                                      })
-                                    );
+            {/* Miglioro il layout del dialog per i farm */}
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+              <Typography variant="body1" sx={{ fontWeight: 'medium', fontSize: '0.95rem' }}>
+                Farm ({formData.farms.length})
+              </Typography>
+              <Button
+                variant="outlined"
+                startIcon={<AddIcon />}
+                onClick={() => {
+                  const newFarms = [
+                    ...formData.farms,
+                    {
+                      nome: "",
+                      tag: "",
+                      diamanti: undefined,
+                      stato: "attivo",
+                      principale: formData.farms.length === 0,
+                      livello: 1,
+                      derby_tags: [],
+                    },
+                  ];
+                  const newFarmExpanded = [...formData.farmExpanded, true];
                                     setFormData({
                                       ...formData,
                                       farms: newFarms,
+                    farmExpanded: newFarmExpanded,
                                     });
                                   }}
-                                />
-                              }
-                              label="Principale"
-                            />
-                          </Typography>
-                        </Grid>
+                size="small"
+                sx={{ py: 0.2, px: 1 }}
+              >
+                Aggiungi Farm
+              </Button>
+            </Box>
+
+            {formData.farms.map((farm, index) => (
+              <Paper
+                elevation={0}
+                variant="outlined"
+                sx={{ 
+                  mb: 0.5,
+                  borderRadius: '8px',
+                  overflow: 'hidden'
+                }}
+                key={index}
+              >
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    py: 0.5,
+                    px: 1.5,
+                    cursor: "pointer",
+                    bgcolor: 'background.paper',
+                  }}
+                  onClick={() => {
+                    const newFarmExpanded = [...formData.farmExpanded];
+                    newFarmExpanded[index] = !newFarmExpanded[index];
+                    setFormData({
+                      ...formData,
+                      farmExpanded: newFarmExpanded,
+                    });
+                  }}
+                >
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1, overflow: "hidden" }}>
+                    <Typography 
+                      sx={{ 
+                        fontWeight: farm.principale ? 'bold' : 'normal',
+                        fontSize: '0.9rem',
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap"
+                      }}
+                    >
+                      {farm.nome || `Farm ${index + 1}`}
+                      {farm.principale && (
+                        <Typography 
+                          component="span" 
+                          sx={{ ml: 0.5, fontSize: '0.8rem' }}
+                        >
+                          👑
+                        </Typography>
+                      )}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Switch
+                      checked={farm.stato === "attivo"}
+                      onChange={(e) =>
+                        handleFarmChange(
+                          index,
+                          "stato",
+                          e.target.checked ? "attivo" : "inattivo"
+                        )
+                      }
+                      size="small"
+                      sx={{ ml: 'auto', mr: 0.5 }}
+                    />
+                    {formData.farmExpanded[index] ? (
+                      <ExpandLessIcon fontSize="small" color="primary" />
+                    ) : (
+                      <ExpandMoreIcon fontSize="small" color="primary" />
+                    )}
+                  </Box>
+                </Box>
+
+                <Collapse in={formData.farmExpanded[index]}>
+                  <Box sx={{ p: 1.5, pt: 1, bgcolor: 'background.paper' }}>
+                    <Grid container spacing={1}>
                         <Grid item xs={12} sm={6}>
                           <TextField
                             fullWidth
@@ -2623,6 +2620,9 @@ export default function GestioneGiocatori() {
                             onChange={(e) =>
                               handleFarmChange(index, "nome", e.target.value)
                             }
+                          size="small"
+                          margin="dense"
+                          sx={{ mt: 0 }}
                           />
                         </Grid>
                         <Grid item xs={12} sm={6}>
@@ -2657,12 +2657,15 @@ export default function GestioneGiocatori() {
                             error={farm.tag !== "" && !isValidTag(farm.tag)}
                             helperText={
                               farm.tag !== "" && !isValidTag(farm.tag)
-                                ? "Il tag deve essere di 8 caratteri (lettere e numeri)"
+                              ? "Tag deve essere 8 caratteri"
                                 : ""
                             }
+                          size="small"
+                          margin="dense"
+                          sx={{ mt: 0 }}
                           />
                         </Grid>
-                        <Grid item xs={12} sm={6}>
+                      <Grid item xs={6} sm={3}>
                           <TextField
                             fullWidth
                             type="number"
@@ -2677,11 +2680,13 @@ export default function GestioneGiocatori() {
                                   : undefined
                               )
                             }
-                            margin="normal"
                             InputProps={{ inputProps: { min: 1 } }}
+                          size="small"
+                          margin="dense"
+                          sx={{ mt: 0 }}
                           />
                         </Grid>
-                        <Grid item xs={12} sm={6}>
+                      <Grid item xs={6} sm={3}>
                           <TextField
                             fullWidth
                             type="number"
@@ -2696,12 +2701,15 @@ export default function GestioneGiocatori() {
                                   : undefined
                               )
                             }
+                          size="small"
+                          margin="dense"
+                          sx={{ mt: 0 }}
                           />
                         </Grid>
 
                         {/* Selettore Derby Tags */}
                         <Grid item xs={12}>
-                          <FormControl fullWidth>
+                        <FormControl fullWidth size="small" margin="dense" sx={{ mt: 0.5 }}>
                             <InputLabel>Derby Tags</InputLabel>
                             <Select
                               multiple
@@ -2734,6 +2742,8 @@ export default function GestioneGiocatori() {
                                         sx={{
                                           bgcolor: derbyInfo?.colore || "#666",
                                           color: "white",
+                                        height: 18,
+                                        fontSize: '0.65rem'
                                         }}
                                       />
                                     );
@@ -2747,12 +2757,13 @@ export default function GestioneGiocatori() {
                                     checked={
                                       (farm.derby_tags || []).indexOf(d.id) > -1
                                     }
+                                  size="small"
                                   />
                                   <Box
                                     component="span"
                                     sx={{
-                                      width: 14,
-                                      height: 14,
+                                    width: 12,
+                                    height: 12,
                                       mr: 1,
                                       borderRadius: "50%",
                                       display: "inline-block",
@@ -2767,74 +2778,68 @@ export default function GestioneGiocatori() {
                         </Grid>
 
                         <Grid item xs={12}>
+                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mt: 0.5 }}>
                           <FormControlLabel
                             control={
                               <Switch
-                                checked={farm.stato === "attivo"}
-                                onChange={(e) =>
-                                  handleFarmChange(
-                                    index,
-                                    "stato",
-                                    e.target.checked ? "attivo" : "inattivo"
-                                  )
-                                }
-                                disabled={!currentUser?.ruolo === "admin"}
+                                checked={farm.principale}
+                                onChange={(e) => {
+                                  const newFarms = formData.farms.map(
+                                    (f, i) => ({
+                                      ...f,
+                                      principale:
+                                        i === index
+                                          ? e.target.checked
+                                          : i === formData.farms.findIndex(f => f.principale) && e.target.checked 
+                                            ? false 
+                                            : f.principale,
+                                    })
+                                  );
+                                  setFormData({
+                                    ...formData,
+                                    farms: newFarms,
+                                  });
+                                }}
+                                size="small"
                               />
                             }
                             label={
-                              farm.stato === "attivo"
-                                ? "Farm Attiva"
-                                : "Farm Inattiva"
+                              <Typography variant="body2" sx={{ fontSize: "0.8rem" }}>
+                                Farm Principale
+                              </Typography>
                             }
                           />
-                        </Grid>
-                      </Grid>
-                    </CardContent>
+                          
                     {formData.farms.length > 1 && (
-                      <CardActions>
                         <Button
                           size="small"
                           color="error"
+                              variant="outlined"
                           onClick={() => {
                             const newFarms = formData.farms.filter(
                               (_, i) => i !== index
                             );
-                            setFormData({ ...formData, farms: newFarms });
-                          }}
-                        >
-                          Rimuovi Farm
-                        </Button>
-                      </CardActions>
-                    )}
-                  </Card>
-                </Grid>
-              ))}
-              <Grid item xs={12}>
-                <Button
-                  variant="outlined"
-                  startIcon={<AddIcon />}
-                  onClick={() => {
+                                const newFarmExpanded = formData.farmExpanded.filter(
+                                  (_, i) => i !== index
+                                );
                     setFormData({
                       ...formData,
-                      farms: [
-                        ...formData.farms,
-                        {
-                          nome: "",
-                          tag: "",
-                          diamanti: undefined,
-                          stato: "attivo",
-                          principale: false,
-                          livello: 1,
-                          derby_tags: [],
-                        },
-                      ],
+                                  farms: newFarms,
+                                  farmExpanded: newFarmExpanded
                     });
                   }}
+                              sx={{ py: 0, minWidth: "auto", fontSize: "0.75rem" }}
                 >
-                  Aggiungi Farm
+                              Rimuovi
                 </Button>
+                          )}
+                        </Box>
               </Grid>
             </Grid>
+                  </Box>
+                </Collapse>
+              </Paper>
+            ))}
           </DialogContent>
           <DialogActions>
             <Button onClick={handleCloseDialog}>Annulla</Button>

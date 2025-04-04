@@ -11,6 +11,8 @@ export interface Assegnazione {
   riferimento_id: string;  // ID dell'incarico o del cesto
   completato: boolean;
   data_assegnazione: Timestamp;
+  data_ultimo_aggiornamento?: Timestamp;
+  stato?: 'attivo' | 'inattivo';
 }
 
 // Interfaccia per il conteggio delle assegnazioni

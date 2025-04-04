@@ -279,8 +279,8 @@ export default function Impostazioni() {
           dataRegistrazione: new Date().toISOString()
         };
 
-        // Crea il nuovo documento del giocatore
-        await setDoc(doc(collection(db, 'utenti')), nuovoGiocatore);
+        // Crea il nuovo documento del giocatore usando il PIN come ID
+        await setDoc(doc(db, 'utenti', nuovoPin.toString()), nuovoGiocatore);
 
         // Mostra il PIN
         setUltimoPinGenerato(nuovoPin);
@@ -1158,4 +1158,4 @@ export default function Impostazioni() {
       </Box>
     </Layout>
   );
-} 
+}
