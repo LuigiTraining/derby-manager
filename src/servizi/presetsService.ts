@@ -1,5 +1,13 @@
 import { PresetAssegnazioni, PresetAssegnazioniRequest } from '../tipi/preset';
-import { collection, doc, getDocs, addDoc, updateDoc, deleteDoc, query, where, Timestamp, getDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, addDoc, updateDoc, deleteDoc, query, where, Timestamp, getDoc } from 'firebase/firestore'
+import { 
+  getDocWithRateLimit, 
+  getDocsWithRateLimit, 
+  setDocWithRateLimit,
+  updateDocWithRateLimit,
+  deleteDocWithRateLimit,
+  addDocWithRateLimit
+} from '../configurazione/firebase';;
 import { db } from '../configurazione/firebase';
 
 const COLLECTION_NAME = 'presets_assegnazioni';
@@ -12,33 +20,17 @@ const CACHE_TIMESTAMP_KEY = 'derby_manager_presets_assegnazioni_timestamp';
  */
 export const caricaPresets = async (forzaAggiornamento: boolean = false): Promise<PresetAssegnazioni[]> => {
   try {
-    // Se non è richiesto un aggiornamento forzato, prova a usare la cache
-    if (!forzaAggiornamento) {
-      const presetsCache = localStorage.getItem(CACHE_KEY);
-      const timestampCache = localStorage.getItem(CACHE_TIMESTAMP_KEY);
-      
-      if (presetsCache && timestampCache) {
-        const oraPrecedente = parseInt(timestampCache);
-        const oraAttuale = Date.now();
-        const differenzaOre = (oraAttuale - oraPrecedente) / (1000 * 60 * 60);
-        
-        // Se sono passate meno di 24 ore, usa la cache
-        if (differenzaOre < 24) {
-          return JSON.parse(presetsCache);
-        }
-      }
-    }
-    
-    // Carica i preset da Firebase
+    // Carica sempre i preset da Firebase, senza usare la cache locale
+    // Questo garantisce che tutti gli utenti vedano gli stessi preset
     const presetsRef = collection(db, COLLECTION_NAME);
-    const snapshot = await getDocs(presetsRef);
+    const snapshot = await getDocsWithRateLimit(presetsRef);
     
     const presets = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     })) as PresetAssegnazioni[];
     
-    // Aggiorna la cache
+    // Aggiorna la cache solo per ottimizzazioni di performance
     localStorage.setItem(CACHE_KEY, JSON.stringify(presets));
     localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
     
@@ -73,7 +65,7 @@ export const creaPreset = async (presetData: PresetAssegnazioniRequest): Promise
     };
     
     // Salva il preset su Firebase
-    const docRef = await addDoc(collection(db, COLLECTION_NAME), nuovoPreset);
+    const docRef = await addDocWithRateLimit(collection(db, COLLECTION_NAME), nuovoPreset);
     
     const presetCreato = {
       id: docRef.id,
@@ -101,10 +93,18 @@ export const creaPreset = async (presetData: PresetAssegnazioniRequest): Promise
  */
 export const aggiornaPreset = async (id: string, presetData: PresetAssegnazioniRequest): Promise<PresetAssegnazioni | null> => {
   try {
-    const presetRef = doc(db, COLLECTION_NAME, id);
-    const presetDoc = await getDoc(presetRef);
+    console.log("Inizio aggiornaPreset:", { id, presetData });
     
-    if (!presetDoc.exists()) return null;
+    const presetRef = doc(db, COLLECTION_NAME, id);
+    const presetDoc = await getDocWithRateLimit(presetRef);
+    
+    if (!presetDoc.exists()) {
+      console.error("Preset non trovato:", id);
+      return null;
+    }
+    
+    const presetEsistente = presetDoc.data();
+    console.log("Preset esistente:", presetEsistente);
     
     const presetAggiornato = {
       nome: presetData.nome,
@@ -113,22 +113,31 @@ export const aggiornaPreset = async (id: string, presetData: PresetAssegnazioniR
       updatedAt: Timestamp.now()
     };
     
-    await updateDoc(presetRef, presetAggiornato);
+    console.log("Dati da aggiornare:", presetAggiornato);
     
+    // Aggiorna il documento su Firebase
+    await updateDocWithRateLimit(presetRef, presetAggiornato);
+    
+    // Costruisci l'oggetto completo con i dati esistenti e quelli aggiornati
     const presetCompleto = {
       id,
-      ...presetDoc.data(),
+      ...presetEsistente,
       ...presetAggiornato
     } as PresetAssegnazioni;
     
-    // Aggiorna la cache locale
-    const presetsCache = await caricaPresets();
-    const presetIndex = presetsCache.findIndex(p => p.id === id);
-    if (presetIndex !== -1) {
-      presetsCache[presetIndex] = presetCompleto;
-      localStorage.setItem(CACHE_KEY, JSON.stringify(presetsCache));
-      localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
-    }
+    console.log("Preset completo dopo aggiornamento:", presetCompleto);
+    
+    // Forza un refresh della cache
+    const presetsRef = collection(db, COLLECTION_NAME);
+    const snapshot = await getDocsWithRateLimit(presetsRef);
+    
+    const presets = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as PresetAssegnazioni[];
+    
+    localStorage.setItem(CACHE_KEY, JSON.stringify(presets));
+    localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
     
     return presetCompleto;
   } catch (error) {
@@ -145,7 +154,7 @@ export const aggiornaPreset = async (id: string, presetData: PresetAssegnazioniR
 export const eliminaPreset = async (id: string): Promise<boolean> => {
   try {
     const presetRef = doc(db, COLLECTION_NAME, id);
-    await deleteDoc(presetRef);
+    await deleteDocWithRateLimit(presetRef);
     
     // Aggiorna la cache locale
     const presetsCache = await caricaPresets();
@@ -174,7 +183,7 @@ export const getPresetById = async (id: string): Promise<PresetAssegnazioni | nu
     
     // Se non trovato in cache, cerca su Firebase
     const presetRef = doc(db, COLLECTION_NAME, id);
-    const presetDoc = await getDoc(presetRef);
+    const presetDoc = await getDocWithRateLimit(presetRef);
     
     if (!presetDoc.exists()) return null;
     
@@ -195,7 +204,7 @@ export const getPresetById = async (id: string): Promise<PresetAssegnazioni | nu
 export const aggiornaUltimoUtilizzo = async (id: string): Promise<void> => {
   try {
     const presetRef = doc(db, COLLECTION_NAME, id);
-    await updateDoc(presetRef, {
+    await updateDocWithRateLimit(presetRef, {
       ultimoUtilizzo: Timestamp.now()
     });
     
@@ -203,7 +212,7 @@ export const aggiornaUltimoUtilizzo = async (id: string): Promise<void> => {
     const presetsCache = await caricaPresets();
     const presetIndex = presetsCache.findIndex(p => p.id === id);
     if (presetIndex !== -1) {
-      presetsCache[presetIndex].ultimoUtilizzo = Date.now();
+      presetsCache[presetIndex].ultimoUtilizzo = Timestamp.now();
       localStorage.setItem(CACHE_KEY, JSON.stringify(presetsCache));
       localStorage.setItem(CACHE_TIMESTAMP_KEY, Date.now().toString());
     }

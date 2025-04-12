@@ -69,15 +69,7 @@ import {
   writeBatch,
   Timestamp,
   setDoc,
-} from "firebase/firestore"
-import { 
-  getDocWithRateLimit, 
-  getDocsWithRateLimit, 
-  setDocWithRateLimit,
-  updateDocWithRateLimit,
-  deleteDocWithRateLimit,
-  addDocWithRateLimit
-} from '../../../configurazione/firebase';;
+} from "firebase/firestore";
 import { db } from "../../../configurazione/firebase";
 import { useAuth } from "../../../componenti/autenticazione/AuthContext";
 import { Farm } from "../../../tipi/giocatore";
@@ -127,7 +119,7 @@ function TabPanel(props: TabPanelProps) {
       {value === index && (
         <Box sx={{ 
           pt: 2, 
-          px: 0,
+          px: { xs: 0, sm: 0, md: 0 },
           width: "100%", 
           maxWidth: "100%", 
           display: "flex", 
@@ -365,7 +357,7 @@ export default function MieiIncarichiNuovo() {
 
       // Aggiorna il documento nel DB
       const userRef = doc(db, "utenti", userId);
-      await updateDocWithRateLimit(userRef, {
+      await updateDoc(userRef, {
         farms: farmsAggiornate
       });
 
@@ -516,7 +508,7 @@ export default function MieiIncarichiNuovo() {
       // Interroga Firebase per tutti i progressi relativi a questa farm
       const progressiRef = collection(db, "progressi");
       const q = query(progressiRef, where("farm_id", "==", farmId));
-      const querySnapshot = await getDocsWithRateLimit(q);
+      const querySnapshot = await getDocs(q);
       
       // Se non ci sono risultati, usa i progressi locali esistenti
       if (querySnapshot.empty) {
@@ -617,9 +609,6 @@ export default function MieiIncarichiNuovo() {
       
       // Formato dell'ID: userId_farmIndex (es. DDe2t7HkxMCqrKqsFZGh_0)
       const farmId = `${userId}_${farmIndex}`;
-      
-      // Definisco una variabile per forzare o meno l'aggiornamento dal server
-      const forzaAggiornamento = false;
       
       // Utilizzo la funzione di cache per caricare le assegnazioni
       // Passa il parametro forzaAggiornamento per forzare l'aggiornamento dal server
@@ -747,46 +736,6 @@ export default function MieiIncarichiNuovo() {
     }
   }, [assegnazioni, incarichi, mostraSoloAssegnati]);
 
-// Funzione per caricare i progressi locali da localStorage
-const caricaProgressiLocali = useCallback(() => {
-  console.log("caricaProgressiLocali chiamata con farmSelezionata:", farmSelezionata);
-  if (farmSelezionata) {
-    try {
-      // Carico i progressi locali per questa farm specifica
-      const chiaveStorage = `progressiLocali_${farmSelezionata}`;
-      const progressiSalvati = localStorage.getItem(chiaveStorage);
-
-      if (progressiSalvati) {
-        const progressiObj = JSON.parse(progressiSalvati);
-        const nuoviProgressiLocali = new Map<string, number>();
-        
-        // Converti l'oggetto in Map
-        Object.entries(progressiObj).forEach(([key, value]) => {
-          nuoviProgressiLocali.set(key, value as number);
-        });
-        
-        // Aggiorna lo stato
-        setProgressiLocali(nuoviProgressiLocali);
-        
-        // Carica anche i progressi modificati
-        const chiaveModificati = `progressiModificati_${farmSelezionata}`;
-        const modificatiSalvati = localStorage.getItem(chiaveModificati);
-        
-        if (modificatiSalvati) {
-          const modificatiArray = JSON.parse(modificatiSalvati);
-          const nuoviModificati = new Set<string>(modificatiArray);
-          setProgressiModificati(nuoviModificati);
-        }
-        
-        // Verifica se ci sono modifiche non sincronizzate
-        verificaModificheNonSincronizzateRef.current(nuoviProgressiLocali);
-      }
-    } catch (error) {
-      console.error("Errore nel caricamento dei progressi locali:", error);
-    }
-  }
-}, [farmSelezionata]);
-
   // Implementazione della funzione caricaProgressi
   useEffect(() => {
     caricaProgressiRef.current = async (assegnazioniData: AssegnazioneEstesa[]) => {
@@ -819,7 +768,7 @@ const caricaProgressiLocali = useCallback(() => {
             where("farm_id", "==", assegnazione.farm_id || "") // Filtro per farm_id, assicurandoci che non sia null
           );
           
-          const querySnapshot = await getDocsWithRateLimit(q);
+          const querySnapshot = await getDocs(q);
           
           let progressoAttuale = 0;
           let progressoDocId = '';
@@ -862,7 +811,7 @@ const caricaProgressiLocali = useCallback(() => {
               if (percentuale >= 100 && !assegnazione.completato) {
                 // Aggiorna lo stato di completamento nel database
                 const assegnazioneRef = doc(db, "assegnazioni", assegnazione.id);
-                await updateDocWithRateLimit(assegnazioneRef, {
+                await updateDoc(assegnazioneRef, {
                   completato: true
                 });
                 
@@ -902,7 +851,7 @@ const caricaProgressiLocali = useCallback(() => {
         where("farm_id", "==", farmId)
       );
       
-      const querySnapshotTuttiProgressi = await getDocsWithRateLimit(qTuttiProgressi);
+      const querySnapshotTuttiProgressi = await getDocs(qTuttiProgressi);
       
       // Mappa per tenere traccia dei progressi per incarico_id
       const progressiPerIncarico = new Map<string, { docId: string, percentuale: number, assegnazioneId: string, timestamp: number }>();
@@ -942,7 +891,7 @@ const caricaProgressiLocali = useCallback(() => {
             if (progresso.assegnazioneId === "" || progresso.assegnazioneId !== assegnazione.id) {
               // Aggiorna il documento di progresso
               const progressoDocRef = doc(db, "progressi", progresso.docId);
-              updateDocWithRateLimit(progressoDocRef, {
+              updateDoc(progressoDocRef, {
                 assegnazione_id: assegnazione.id
               }).catch(error => {
                 console.error("Errore nell'aggiornamento del documento di progresso:", error);
@@ -963,7 +912,7 @@ const caricaProgressiLocali = useCallback(() => {
             if ((assegnazione.quantita === 0 || assegnazione.quantita === undefined) && progresso.percentuale > 0) {
               // Aggiorna il documento di assegnazione
               const assegnazioneRef = doc(db, "assegnazioni", assegnazione.id);
-              updateDocWithRateLimit(assegnazioneRef, {
+              updateDoc(assegnazioneRef, {
                 quantita: progresso.percentuale
               }).catch(error => {
                 console.error("Errore nell'aggiornamento dell'assegnazione:", error);
@@ -1074,9 +1023,6 @@ const caricaProgressiLocali = useCallback(() => {
         // Formato dell'ID: userId_farmIndex (es. DDe2t7HkxMCqrKqsFZGh_0)
         const farmId = `${userId}_${farmIndex}`;
         
-        // Definisco una variabile per forzare o meno l'aggiornamento dal server
-        const forzaAggiornamento = false;
-        
         // Utilizzo la funzione di cache per caricare le assegnazioni
         // Passa il parametro forzaAggiornamento per forzare l'aggiornamento dal server
         const assegnazioniData = await caricaAssegnazioniConCache(userId, forzaAggiornamento);
@@ -1116,7 +1062,7 @@ const caricaProgressiLocali = useCallback(() => {
     try {
       const giocatoriRef = collection(db, "utenti");
       const q = query(giocatoriRef);
-      const querySnapshot = await getDocsWithRateLimit(q);
+      const querySnapshot = await getDocs(q);
       
       const giocatoriData: any[] = [];
       querySnapshot.forEach((doc) => {
@@ -1168,7 +1114,7 @@ const caricaProgressiLocali = useCallback(() => {
       if (currentUser) {
         // Ottieni le farm dell'utente corrente
         const userRef = doc(db, "utenti", currentUser.id);
-        const userDoc = await getDocWithRateLimit(userRef);
+        const userDoc = await getDoc(userRef);
         
         if (userDoc.exists()) {
           const userData = userDoc.data();
@@ -1325,9 +1271,9 @@ const caricaProgressiLocali = useCallback(() => {
     
     // Carica i progressi locali con una chiave che include l'ID della farm
     const chiaveStorage = `progressiLocali_${nuovaFarm}`;
-        const progressiSalvati = localStorage.getItem(chiaveStorage);
-
-        if (progressiSalvati) {
+    const progressiSalvati = localStorage.getItem(chiaveStorage);
+    
+    if (progressiSalvati) {
       try {
         const progressiObj = JSON.parse(progressiSalvati);
         
@@ -1977,7 +1923,7 @@ const caricaProgressiLocali = useCallback(() => {
         
         const incaricoCompletato = nuovoProgresso >= quantitaRichiesta;
         
-        await updateDocWithRateLimit(assegnazioneRef, {
+        await updateDoc(assegnazioneRef, {
           completato: incaricoCompletato,
           quantita: nuovoProgresso
         });
@@ -2002,7 +1948,7 @@ const caricaProgressiLocali = useCallback(() => {
         const progressoDocId = progressiDocs.get(incaricoId);
         if (progressoDocId) {
           const progressoRef = doc(db, "progressi", progressoDocId);
-          await updateDocWithRateLimit(progressoRef, {
+          await updateDoc(progressoRef, {
             percentuale: nuovoProgresso
           });
         } else if (nuovoProgresso > 0) {
@@ -2013,7 +1959,7 @@ const caricaProgressiLocali = useCallback(() => {
           const assegnazioneIncarico = assegnazioni.find(a => a.riferimento_id === incaricoId && a.farm_id === farmId);
           
           // Creiamo il documento con il farm_id corretto
-          const nuovoProgressoDoc = await addDocWithRateLimit(progressiRef, {
+          const nuovoProgressoDoc = await addDoc(progressiRef, {
             assegnazione_id: assegnazioneIncarico ? assegnazioneIncarico.id : "",
             farm_id: farmId,
             incarico_id: incaricoId, // Aggiungiamo l'ID dell'incarico
@@ -2030,7 +1976,7 @@ const caricaProgressiLocali = useCallback(() => {
         }
       } else {
         // Se stiamo deselezionando l'incarico, mantieni il progresso attuale ma rimuovi il flag completato
-        await updateDocWithRateLimit(assegnazioneRef, {
+        await updateDoc(assegnazioneRef, {
           completato: false
         });
         
@@ -2059,7 +2005,7 @@ const caricaProgressiLocali = useCallback(() => {
         
         // Aggiorna lo stato di completamento del cesto
         const cestoRef = doc(db, "assegnazioni", assegnazioneCesto.id);
-        await updateDocWithRateLimit(cestoRef, {
+        await updateDoc(cestoRef, {
           completato: tuttiCompletatiNelCesto
         });
         
@@ -2121,7 +2067,7 @@ const caricaProgressiLocali = useCallback(() => {
       if (assegnazioneCesto) {
         // Aggiorna lo stato di completamento del cesto nel database
         const cestoRef = doc(db, "assegnazioni", assegnazioneCesto.id);
-        await updateDocWithRateLimit(cestoRef, {
+        await updateDoc(cestoRef, {
           completato: tuttiCompletatiNelCesto
         });
         
@@ -2287,7 +2233,7 @@ const caricaProgressiLocali = useCallback(() => {
       // Interroga Firebase per tutti i progressi relativi a questa farm
       const progressiRef = collection(db, "progressi");
       const q = query(progressiRef, where("farm_id", "==", farmId));
-      const querySnapshot = await getDocsWithRateLimit(q);
+      const querySnapshot = await getDocs(q);
       
       // Se non ci sono risultati, usa i progressi locali esistenti
       if (querySnapshot.empty) {
@@ -2377,7 +2323,7 @@ const caricaProgressiLocali = useCallback(() => {
             where("farm_id", "==", farmId)
           );
           
-          const querySnapshot = await getDocsWithRateLimit(qPerChiave);
+          const querySnapshot = await getDocs(qPerChiave);
           
           if (querySnapshot.size > 0) {
             // Se esistono documenti, trova quello più recente
@@ -2401,7 +2347,7 @@ const caricaProgressiLocali = useCallback(() => {
               
               // Se la quantità è zero, aggiungi un campo data_zero e da_eliminare
               if (quantita === 0) {
-                await updateDocWithRateLimit(progressoDocRef, {
+                await updateDoc(progressoDocRef, {
                   percentuale: quantita,
                   timestamp: serverTimestamp(),
                   assegnazione_id: assegnazione ? assegnazione.id : "",
@@ -2411,7 +2357,7 @@ const caricaProgressiLocali = useCallback(() => {
 
               } else {
                 // Se la quantità non è zero, rimuovi i campi data_zero e da_eliminare se esistono
-                await updateDocWithRateLimit(progressoDocRef, {
+                await updateDoc(progressoDocRef, {
                   percentuale: quantita,
                   timestamp: serverTimestamp(),
                   assegnazione_id: assegnazione ? assegnazione.id : "",
@@ -2460,7 +2406,7 @@ const caricaProgressiLocali = useCallback(() => {
                 if (percentuale >= 100 && !assegnazione.completato) {
                   // Aggiorna lo stato di completamento nel database
                   const assegnazioneRef = doc(db, "assegnazioni", assegnazione.id);
-                  await updateDocWithRateLimit(assegnazioneRef, {
+                  await updateDoc(assegnazioneRef, {
                     completato: true,
                     quantita: quantita
                   });
@@ -2476,7 +2422,7 @@ const caricaProgressiLocali = useCallback(() => {
                 } else if (assegnazione.quantita !== quantita) {
                   // Aggiorna la quantità nell'assegnazione
                   const assegnazioneRef = doc(db, "assegnazioni", assegnazione.id);
-                  await updateDocWithRateLimit(assegnazioneRef, {
+                  await updateDoc(assegnazioneRef, {
                     quantita: quantita
                   });
                   
@@ -2547,7 +2493,7 @@ const caricaProgressiLocali = useCallback(() => {
     }
     
     // Crea un nuovo documento
-    const nuovoProgressoRef = await addDocWithRateLimit(progressiRef, datiDocumento);
+    const nuovoProgressoRef = await addDoc(progressiRef, datiDocumento);
     
     // Aggiorna la mappa dei progressiDocs
     setProgressiDocs(prev => {
@@ -2585,7 +2531,7 @@ const caricaProgressiLocali = useCallback(() => {
         where("data_zero", "<=", timestampTrentaGiorniFa)
       );
       
-      const querySnapshot = await getDocsWithRateLimit(q);
+      const querySnapshot = await getDocs(q);
       
       if (querySnapshot.empty) {
 
@@ -2840,7 +2786,7 @@ const caricaProgressiLocali = useCallback(() => {
       // Interroga Firebase per i progressi relativi a questa farm
       const progressiRef = collection(db, "progressi");
       const q = query(progressiRef, where("farm_id", "==", farmSelezionata));
-      const snapshot = await getDocsWithRateLimit(q);
+      const snapshot = await getDocs(q);
 
 
       
@@ -2898,14 +2844,14 @@ const caricaProgressiLocali = useCallback(() => {
   return (
     <Layout>
       {/* Rimuovo i pulsanti fissi in alto */}
-      <Container maxWidth="lg" sx={{ mt: 2, mb: 4, mx: 'auto', px: 0, overflow: 'hidden' }}>
+      <Container maxWidth="md" sx={{ mt: 2, mb: 4, mx: 'auto', px: { xs: 0, sm: 2 }, overflow: 'hidden' }}>
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
             {error}
           </Alert>
         )}
         
-        <Paper sx={{ p: 2, pb: 2, pt: 2, px: 0, mb: 2, boxShadow: 'none', border: 'none', width: '100%' }}>
+        <Paper sx={{ p: 2, pb: 2, pt: 2, px: 0, mb: 2, boxShadow: 'none', border: 'none' }}>
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2, px: 2 }}>
             {/* Rimuovo il titolo "I miei incarichi" */}
             
@@ -3339,7 +3285,7 @@ const caricaProgressiLocali = useCallback(() => {
                         // Elimina tutti i documenti di progresso per questa farm
                         for (const [incaricoId, progressoDocId] of progressiDocs.entries()) {
                           const progressoRef = doc(db, "progressi", progressoDocId);
-                          await deleteDocWithRateLimit(progressoRef);
+                          await deleteDoc(progressoRef);
                         }
                         
                         // Resetta tutti i progressi a 0
@@ -3371,7 +3317,7 @@ const caricaProgressiLocali = useCallback(() => {
                         for (const assegnazione of assegnazioniDaAggiornare) {
                           if (assegnazione.completato || assegnazione.quantita) {
                             const assegnazioneRef = doc(db, "assegnazioni", assegnazione.id);
-                            await updateDocWithRateLimit(assegnazioneRef, {
+                            await updateDoc(assegnazioneRef, {
                               completato: false,
                               quantita: 0
                             });
@@ -3628,7 +3574,7 @@ const caricaProgressiLocali = useCallback(() => {
             >
               <Tab 
                 label={
-                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
                     <Typography component="span" sx={{ fontSize: '0.85rem', fontWeight: 500 }}>{t('assegnazioni.incarichi')}</Typography>
                     <Chip 
                       label={numeroIncarichiMostrati} 
@@ -3638,7 +3584,6 @@ const caricaProgressiLocali = useCallback(() => {
                         height: 18, 
                         fontSize: '0.7rem', 
                         fontWeight: 'bold',
-                        mt: 0.5,
                         '& .MuiChip-label': { px: 0.7, py: 0 } 
                       }} 
                     />
@@ -3647,7 +3592,7 @@ const caricaProgressiLocali = useCallback(() => {
               />
               <Tab 
                 label={
-                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
                     <Typography component="span" sx={{ fontSize: '0.85rem', fontWeight: 500 }}>{t('assegnazioni.città')}</Typography>
                     <Chip 
                       label={numeroIncarichiCittaMostrati} 
@@ -3657,7 +3602,6 @@ const caricaProgressiLocali = useCallback(() => {
                         height: 18, 
                         fontSize: '0.7rem', 
                         fontWeight: 'bold',
-                        mt: 0.5,
                         '& .MuiChip-label': { px: 0.7, py: 0 } 
                       }} 
                     />
@@ -3666,7 +3610,7 @@ const caricaProgressiLocali = useCallback(() => {
               />
               <Tab 
                 label={
-                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.8 }}>
                     <Typography component="span" sx={{ fontSize: '0.85rem', fontWeight: 500 }}>{t('assegnazioni.cesti')}</Typography>
                     <Chip 
                       label={numeroCestiMostrati} 
@@ -3676,7 +3620,6 @@ const caricaProgressiLocali = useCallback(() => {
                         height: 18, 
                         fontSize: '0.7rem', 
                         fontWeight: 'bold',
-                        mt: 0.5,
                         '& .MuiChip-label': { px: 0.7, py: 0 } 
                       }} 
                     />
@@ -3687,7 +3630,7 @@ const caricaProgressiLocali = useCallback(() => {
           </Box>
           
           {/* Contenuto principale */}
-          <Box sx={{ px: 0 }}>
+          <Box>
             {loading ? (
               <Box sx={{ display: "flex", justifyContent: "center", my: 4 }}>
                 <CircularProgress />
@@ -3826,5 +3769,3 @@ const caricaProgressiLocali = useCallback(() => {
     </Layout>
   );
 }
-
-

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, createContext, useContext } from "react";
 import {
   AppBar,
   Box,
@@ -51,6 +51,7 @@ import {
   where,
   onSnapshot,
   orderBy,
+  getDocs
 } from "firebase/firestore";
 import { db } from "../../configurazione/firebase";
 import DerbyChips from "../derby/DerbyChips";
@@ -70,6 +71,38 @@ interface MenuItem {
 
 interface Props {
   children: React.ReactNode;
+}
+
+interface RichiesteContextType {
+  nuoveRichieste: number;
+  setNuoveRichieste: React.Dispatch<React.SetStateAction<number>>;
+  aggiornaRichieste: () => Promise<void>;
+}
+
+const RichiesteContext = createContext<RichiesteContextType | undefined>(undefined);
+
+export const useRichieste = () => {
+  const context = useContext(RichiesteContext);
+  if (context === undefined) {
+    throw new Error('useRichieste deve essere usato all\'interno di un RichiesteProvider');
+  }
+  return context;
+};
+
+// Funzione per ottenere il conteggio delle richieste in attesa
+export async function getConteggiRichieste() {
+  try {
+    const q = query(
+      collection(db, "richieste_registrazione"),
+      where("stato", "==", "in_attesa")
+    );
+    
+    const snapshot = await getDocs(q);
+    return snapshot.docs.length;
+  } catch (error) {
+    console.error("Errore nel controllo delle richieste:", error);
+    return 0;
+  }
 }
 
 export default function Layout({ children }: Props) {
@@ -109,18 +142,29 @@ export default function Layout({ children }: Props) {
   // Ascolta le richieste di registrazione in attesa
   useEffect(() => {
     if (["admin", "coordinatore"].includes(currentUser?.ruolo || "")) {
-      const q = query(
-        collection(db, "richieste_registrazione"),
-        where("stato", "==", "in_attesa")
-      );
+      // Funzione per controllare le richieste in attesa
+      const checkRichieste = async () => {
+        const conteggio = await getConteggiRichieste();
+        setNuoveRichieste(conteggio);
+      };
 
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        setNuoveRichieste(snapshot.docs.length);
-      });
-
-      return () => unsubscribe();
+      // Controlla all'avvio
+      checkRichieste();
+      
+      // Controlla ogni ora invece che in tempo reale
+      const intervalId = setInterval(checkRichieste, 60 * 60 * 1000);
+      
+      return () => {
+        clearInterval(intervalId);
+      };
     }
   }, [currentUser]);
+
+  // Funzione per aggiornare manualmente il conteggio delle richieste
+  const aggiornaRichieste = async (): Promise<void> => {
+    const conteggio = await getConteggiRichieste();
+    setNuoveRichieste(conteggio);
+  };
 
   const getMenuItems = () => {
     if (!currentUser) return [];
@@ -177,7 +221,7 @@ export default function Layout({ children }: Props) {
         {
           text: "Assegnazioni",
           icon: <AssignmentIcon />,
-          path: "/admin/test-assegnazioni",
+          path: "/test-assegnazioni",
           sx: { backgroundColor: 'rgba(255, 0, 0, 0.05)' }
         },
         {
@@ -217,8 +261,12 @@ export default function Layout({ children }: Props) {
       if (currentUser.ruolo === "admin") {
         items.push({
           text: t("barraLaterale.impostazioni"),
-          icon: <SettingsIcon />,
-          path: "/impostazioni",
+          icon: (
+            <Badge badgeContent={nuoveRichieste} color="error" invisible={nuoveRichieste === 0}>
+              <SettingsIcon />
+            </Badge>
+          ),
+          path: "/admin/impostazioni",
         });
       }
 
@@ -258,12 +306,6 @@ export default function Layout({ children }: Props) {
           text: t("barraLaterale.dashboard"),
           icon: <DashboardIcon />,
           path: "/dashboard",
-        },
-        {
-          text: "Assegnazioni",
-          icon: <AssignmentIcon />,
-          path: "/admin/test-assegnazioni",
-          sx: { backgroundColor: 'rgba(255, 0, 0, 0.05)' }
         },
         {
           text: t("barraLaterale.listaGlobale"),
@@ -322,11 +364,6 @@ export default function Layout({ children }: Props) {
         icon: <TaskIcon />,
         path: "/giocatore/nuovo/miei-incarichi",
         sx: { backgroundColor: 'rgba(255, 0, 0, 0.05)' }
-      },
-      {
-        text: t("barraLaterale.blocchi"),
-        icon: <BlockIcon />,
-        path: "/admin/blocchi",
       },
       {
         text: t("barraLaterale.giocatori"),
@@ -425,9 +462,11 @@ export default function Layout({ children }: Props) {
             width: "auto",
           }}
         />
-        <Typography variant="h6" noWrap component="div">
-          Perché No
-        </Typography>
+        <Badge badgeContent={nuoveRichieste} color="error" invisible={nuoveRichieste === 0}>
+          <Typography variant="h6" noWrap component="div">
+            Perché No
+          </Typography>
+        </Badge>
       </Toolbar>
       <Divider />
       <DerbyChips />
@@ -448,132 +487,139 @@ export default function Layout({ children }: Props) {
   );
 
   return (
-    <Box sx={{ display: "flex" }}>
-      <CssBaseline />
-      <AppBar
-        position="fixed"
-        sx={{
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
-          ml: { sm: `${drawerWidth}px` },
-        }}
-      >
-        <Toolbar>
-          <IconButton
-            color="inherit"
-            aria-label="open drawer"
-            edge="start"
-            onClick={handleDrawerToggle}
-            sx={{ mr: 2, display: { sm: "none" } }}
-          >
-            <MenuIcon />
-          </IconButton>
-          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            {menuItems.reduce((title, item) => {
-              // Caso speciale per il percorso "/admin/test-assegnazioni"
-              if (location.pathname === "/admin/test-assegnazioni") return "Assegnazioni";
-              
-              // Caso speciale per il percorso "/giocatore/nuovo/miei-incarichi"
-              if (location.pathname === "/giocatore/nuovo/miei-incarichi") {
-                // Mostra "Lista globale" per admin e moderatori, "Lista" per i giocatori
-                if (["admin", "coordinatore", "moderatore"].includes(currentUser?.ruolo || "")) {
-                  return t("barraLaterale.listaGlobale");
-                } else {
-                  return "Lista";
-                }
-              }
-              
-              if (item.path === location.pathname) return item.text;
-              if (item.children) {
-                const child = item.children.find(
-                  (child) => child.path === location.pathname
-                );
-                if (child) return child.text;
-              }
-              return title;
-            }, "Derby Manager")}
-          </Typography>
-          <IconButton
-            color="inherit"
-            onClick={() => navigate("/welcome")}
-            sx={{ mr: 2 }}
-            aria-label="vai alla home"
-          >
-            <HomeIcon />
-          </IconButton>
-          <LanguageSwitcher />
-          <Box sx={{ textAlign: "right", ml: 2 }}>
-            <Typography variant="body1">{currentUser?.nome}</Typography>
-            {currentUser &&
-              ["moderatore", "coordinatore"].includes(currentUser.ruolo) && (
-                <Typography
-                  variant="caption"
-                  sx={{
-                    color: "white",
-                    fontStyle: "italic",
-                    fontSize: "0.7rem",
-                    display: "block",
-                    lineHeight: 1,
-                    mt: -0.5,
-                  }}
-                >
-                  {currentUser.ruolo.charAt(0).toUpperCase() +
-                    currentUser.ruolo.slice(1)}
-                </Typography>
-              )}
-          </Box>
-        </Toolbar>
-      </AppBar>
-      <Box
-        component="nav"
-        sx={{
-          width: { sm: drawerWidth },
-          flexShrink: { sm: 0 },
-          borderRight: "1px solid",
-          borderColor: "divider",
-        }}
-      >
-        <Drawer
-          variant={isMobile ? "temporary" : "permanent"}
-          open={isMobile ? mobileOpen : true}
-          onClose={handleDrawerToggle}
-          ModalProps={{
-            keepMounted: true, // Better open performance on mobile.
-          }}
+    <RichiesteContext.Provider value={{ nuoveRichieste, setNuoveRichieste, aggiornaRichieste }}>
+      <Box sx={{ display: "flex" }}>
+        <CssBaseline />
+        <AppBar
+          position="fixed"
           sx={{
-            "& .MuiDrawer-paper": {
-              boxSizing: "border-box",
-              width: drawerWidth,
-              borderRight: "none",
-              "&::-webkit-scrollbar": {
-                width: "4px",
-              },
-              "&::-webkit-scrollbar-track": {
-                background: "transparent",
-              },
-              "&::-webkit-scrollbar-thumb": {
-                background: "rgba(0, 0, 0, 0.1)",
-                borderRadius: "4px",
-              },
-              "&::-webkit-scrollbar-thumb:hover": {
-                background: "rgba(0, 0, 0, 0.2)",
-              },
-            },
+            width: { sm: `calc(100% - ${drawerWidth}px)` },
+            ml: { sm: `${drawerWidth}px` },
           }}
         >
-          {drawer}
-        </Drawer>
+          <Toolbar>
+            <IconButton
+              color="inherit"
+              aria-label="open drawer"
+              edge="start"
+              onClick={handleDrawerToggle}
+              sx={{ mr: 2, display: { sm: "none" } }}
+            >
+              <MenuIcon />
+            </IconButton>
+            <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
+              {menuItems.reduce((title, item) => {
+                // Caso speciale per il percorso "/admin/test-assegnazioni"
+                if (location.pathname === "/admin/test-assegnazioni") return "Assegnazioni";
+                
+                // Caso speciale per il percorso "/giocatore/nuovo/miei-incarichi"
+                if (location.pathname === "/giocatore/nuovo/miei-incarichi") {
+                  // Mostra "Lista globale" per admin e moderatori, "Lista" per i giocatori
+                  if (["admin", "coordinatore", "moderatore"].includes(currentUser?.ruolo || "")) {
+                    return t("barraLaterale.listaGlobale");
+                  } else {
+                    return "Lista";
+                  }
+                }
+                
+                if (item.path === location.pathname) return item.text;
+                if (item.children) {
+                  const child = item.children.find(
+                    (child) => child.path === location.pathname
+                  );
+                  if (child) return child.text;
+                }
+                return title;
+              }, "Derby Manager")}
+            </Typography>
+            <Badge badgeContent={nuoveRichieste} color="error" invisible={nuoveRichieste === 0} sx={{ mr: 1 }}>
+              <IconButton
+                color="inherit"
+                onClick={() => navigate("/welcome")}
+                sx={{ mr: 1 }}
+                aria-label="vai alla home"
+              >
+                <HomeIcon />
+              </IconButton>
+            </Badge>
+            <LanguageSwitcher />
+            <Box sx={{ textAlign: "right", ml: 2 }}>
+              <Typography variant="body1">{currentUser?.nome}</Typography>
+              {currentUser &&
+                ["moderatore", "coordinatore"].includes(currentUser.ruolo) && (
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      color: "white",
+                      fontStyle: "italic",
+                      fontSize: "0.7rem",
+                      display: "block",
+                      lineHeight: 1,
+                      mt: -0.5,
+                    }}
+                  >
+                    {currentUser.ruolo === "coordinatore" 
+                      ? "Co-Leader" 
+                      : currentUser.ruolo === "moderatore" 
+                        ? "Gestore" 
+                        : currentUser.ruolo.charAt(0).toUpperCase() + currentUser.ruolo.slice(1)}
+                  </Typography>
+                )}
+            </Box>
+          </Toolbar>
+        </AppBar>
+        <Box
+          component="nav"
+          sx={{
+            width: { sm: drawerWidth },
+            flexShrink: { sm: 0 },
+            borderRight: "1px solid",
+            borderColor: "divider",
+          }}
+        >
+          <Drawer
+            variant={isMobile ? "temporary" : "permanent"}
+            open={isMobile ? mobileOpen : true}
+            onClose={handleDrawerToggle}
+            ModalProps={{
+              keepMounted: true, // Better open performance on mobile.
+            }}
+            sx={{
+              "& .MuiDrawer-paper": {
+                boxSizing: "border-box",
+                width: drawerWidth,
+                borderRight: "none",
+                "&::-webkit-scrollbar": {
+                  width: "4px",
+                },
+                "&::-webkit-scrollbar-track": {
+                  background: "transparent",
+                },
+                "&::-webkit-scrollbar-thumb": {
+                  background: "rgba(0, 0, 0, 0.1)",
+                  borderRadius: "4px",
+                },
+                "&::-webkit-scrollbar-thumb:hover": {
+                  background: "rgba(0, 0, 0, 0.2)",
+                },
+              },
+            }}
+          >
+            {drawer}
+          </Drawer>
+        </Box>
+        <Box
+          component="main"
+          sx={{
+            flexGrow: 1,
+            p: { xs: 1, sm: 2 },
+            width: { sm: `calc(100% - ${drawerWidth}px)` },
+            mt: "64px", // Altezza della AppBar
+          }}
+        >
+          {children}
+        </Box>
       </Box>
-      <Box
-        component="main"
-        sx={{
-          flexGrow: 1,
-          p: { xs: 1, sm: 2 },
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
-          mt: "64px", // Altezza della AppBar
-        }}
-      >
-        {children}
-      </Box>
-    </Box>
+    </RichiesteContext.Provider>
   );
 }

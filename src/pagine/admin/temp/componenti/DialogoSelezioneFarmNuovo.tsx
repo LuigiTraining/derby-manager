@@ -25,8 +25,10 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  IconButton,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
+import ClearIcon from "@mui/icons-material/Clear";
 import { collection, getDocs, query, where, orderBy, limit } from "firebase/firestore";
 import { db } from "../../../../configurazione/firebase";
 
@@ -90,6 +92,8 @@ const DialogoSelezioneFarm: React.FC<DialogoSelezioneFarmProps> = ({
   const [selectedFarmIds, setSelectedFarmIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [mostraFarmInattive, setMostraFarmInattive] = useState(false);
+  const [mostraTagDerby, setMostraTagDerby] = useState(false);
+  const [mostraGiaAssegnati, setMostraGiaAssegnati] = useState(true);
   const [derby, setDerby] = useState<Derby[]>([]);
   const [selectedDerby, setSelectedDerby] = useState<string>("");
   const [userChangedDerby, setUserChangedDerby] = useState<boolean>(false);
@@ -251,11 +255,11 @@ const DialogoSelezioneFarm: React.FC<DialogoSelezioneFarmProps> = ({
       // Filtra per livello minimo - non mostriamo le farm con livello insufficiente
       if (farm.livello < livelloMinimo) return false;
       
-      // Filtra le farm già assegnate
-      if (farmIdsGiaAssegnate.includes(farm.id)) return false;
+      // Non filtrare più le farm già assegnate, le mostriamo tutte
       
       // Filtra per derby selezionato
       if (selectedDerby && farm.derby_tags) {
+        // Verifica se la farm ha il derby selezionato nei suoi tag
         if (!Array.isArray(farm.derby_tags)) {
           return false;
         }
@@ -284,8 +288,8 @@ const DialogoSelezioneFarm: React.FC<DialogoSelezioneFarmProps> = ({
       // Filtra per livello minimo - non mostriamo le farm con livello insufficiente
       if (farm.livello < livelloMinimo) return false;
       
-      // Filtra le farm già assegnate
-      if (farmIdsGiaAssegnate.includes(farm.id)) return false;
+      // Filtra le farm già assegnate se l'opzione è disattivata
+      if (!mostraGiaAssegnati && isFarmAssigned(farm.id)) return false;
       
       // Filtra per derby selezionato
       if (selectedDerby && farm.derby_tags) {
@@ -307,8 +311,16 @@ const DialogoSelezioneFarm: React.FC<DialogoSelezioneFarmProps> = ({
     });
   };
 
+  // Verifica se una farm è già assegnata
+  const isFarmAssigned = (farmId: string) => {
+    return farmIdsGiaAssegnate.includes(farmId);
+  };
+
   // Gestisce la selezione/deselezione di una farm
   const handleToggleFarm = (farmId: string) => {
+    // Non fare nulla se la farm è già assegnata
+    if (isFarmAssigned(farmId)) return;
+    
     setSelectedFarmIds((prev) => {
       if (prev.includes(farmId)) {
         return prev.filter(id => id !== farmId);
@@ -415,9 +427,21 @@ const DialogoSelezioneFarm: React.FC<DialogoSelezioneFarmProps> = ({
     setSearchQuery("");
     setSelectedDerby("");
     setMostraFarmInattive(false);
+    setMostraTagDerby(false);
+    setMostraGiaAssegnati(true);
     setUserChangedDerby(true);
     localStorage.removeItem(`derbySelezionato_${riferimentoId}`);
   };
+
+  // Reset dello stato quando il dialogo si apre
+  useEffect(() => {
+    if (open) {
+      // Reset degli stati
+      setSearchQuery("");
+      setSelectedFarmIds([]);
+      setMostraGiaAssegnati(true); // Reset alla modalità di visualizzazione predefinita
+    }
+  }, [open]);
 
   return (
     <Dialog 
@@ -508,77 +532,134 @@ const DialogoSelezioneFarm: React.FC<DialogoSelezioneFarmProps> = ({
           )}
         </Box>
         
-        <TextField
-          fullWidth
-          variant="outlined"
-          placeholder="Cerca giocatore o farm..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          sx={{ mb: 1 }}
-          size="small"
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" />
-              </InputAdornment>
-            ),
-          }}
-        />
-        
-        <FormControl fullWidth size="small" sx={{ mb: 1 }}>
-          <InputLabel id="derby-select-label">Filtra per Derby</InputLabel>
-          <Select
-            labelId="derby-select-label"
-            id="derby-select"
-            value={selectedDerby}
-            label="Filtra per Derby"
-            onChange={(e) => handleDerbyChange(e.target.value)}
-          >
-            <MenuItem value="">
-              <em>Tutti i Derby</em>
-            </MenuItem>
-            {derby.map((d) => (
-              <MenuItem key={d.id} value={d.id}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Box
-                    sx={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: '50%',
-                      backgroundColor: d.colore || '#1976d2',
-                      border: '1px solid #ddd'
-                    }}
-                  />
-                  <Typography variant="body2">{d.nome}</Typography>
-                </Box>
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, mt: 0.5 }}>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={mostraFarmInattive}
-                onChange={(e) => setMostraFarmInattive(e.target.checked)}
-                size="small"
-              />
-            }
-            label={<Typography variant="body2" sx={{ fontSize: '0.8rem' }}>Mostra farm inattive</Typography>}
-            sx={{ mr: 1 }}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 1.5 }}>
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="Cerca giocatore o farm..."
+            variant="outlined"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" />
+                </InputAdornment>
+              ),
+              endAdornment: searchQuery ? (
+                <InputAdornment position="end">
+                  <IconButton
+                    size="small"
+                    onClick={() => setSearchQuery("")}
+                    edge="end"
+                  >
+                    <ClearIcon fontSize="small" />
+                  </IconButton>
+                </InputAdornment>
+              ) : null,
+            }}
           />
           
-          {(searchQuery || selectedDerby || mostraFarmInattive) && (
-            <Button 
-              size="small" 
-              onClick={handleResetFilters}
-              variant="outlined"
-              sx={{ fontSize: '0.75rem', py: 0.25, px: 1 }}
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={mostraFarmInattive}
+                  onChange={(e) => setMostraFarmInattive(e.target.checked)}
+                  size="small"
+                />
+              }
+              label={<Typography variant="body2" sx={{ fontSize: '0.8rem' }}>Mostra farm inattive</Typography>}
+            />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={mostraTagDerby}
+                  onChange={(e) => setMostraTagDerby(e.target.checked)}
+                  size="small"
+                />
+              }
+              label={<Typography variant="body2" sx={{ fontSize: '0.8rem' }}>Mostra tag derby</Typography>}
+            />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={mostraGiaAssegnati}
+                  onChange={(e) => setMostraGiaAssegnati(e.target.checked)}
+                  size="small"
+                />
+              }
+              label={<Typography variant="body2" sx={{ fontSize: '0.8rem' }}>Mostra già assegnati</Typography>}
+            />
+          </Box>
+          
+          <FormControl fullWidth size="small" variant="outlined" sx={{ mb: 0.5 }}>
+            <InputLabel id="derby-select-label">Derby</InputLabel>
+            <Select
+              labelId="derby-select-label"
+              value={selectedDerby}
+              onChange={(e) => handleDerbyChange(e.target.value)}
+              label="Derby"
+              displayEmpty
             >
-              Resetta filtri
-            </Button>
-          )}
+              <MenuItem value="">
+                <em>Tutti i Derby</em>
+              </MenuItem>
+              {derby.map((d) => (
+                <MenuItem key={d.id} value={d.id}>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Box
+                      sx={{
+                        width: 12,
+                        height: 12,
+                        bgcolor: d.colore || 'primary.main',
+                        borderRadius: '50%',
+                        mr: 1,
+                      }}
+                    />
+                    {d.nome}
+                  </Box>
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={
+                    giocatoriFiltrati
+                      .flatMap(giocatore => filteredFarms(giocatore.farms)
+                        .filter(farm => !isFarmAssigned(farm.id))
+                        .map(farm => farm.id))
+                      .every(farmId => selectedFarmIds.includes(farmId)) &&
+                    giocatoriFiltrati
+                      .flatMap(giocatore => filteredFarms(giocatore.farms)
+                        .filter(farm => !isFarmAssigned(farm.id))).length > 0
+                  }
+                  onChange={(e) => {
+                    const allVisibleFarmIds = giocatoriFiltrati
+                      .flatMap(giocatore => filteredFarms(giocatore.farms)
+                        .filter(farm => !isFarmAssigned(farm.id))
+                        .map(farm => farm.id));
+                    
+                    if (e.target.checked) {
+                      setSelectedFarmIds(Array.from(new Set([...selectedFarmIds, ...allVisibleFarmIds])));
+                    } else {
+                      setSelectedFarmIds(selectedFarmIds.filter(id => !allVisibleFarmIds.includes(id)));
+                    }
+                  }}
+                  sx={{ '& .MuiSvgIcon-root': { fontSize: '1.2rem' } }}
+                />
+              }
+              label={
+                <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                  Seleziona tutto
+                </Typography>
+              }
+            />
+          </Box>
         </Box>
         
         {loading ? (
@@ -591,25 +672,6 @@ const DialogoSelezioneFarm: React.FC<DialogoSelezioneFarmProps> = ({
           </Typography>
         ) : (
           <>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    checked={areAllVisibleFarmsSelected()}
-                    onChange={handleSelectAllVisibleFarms}
-                    indeterminate={selectedFarmIds.length > 0 && !areAllVisibleFarmsSelected()}
-                    size="small"
-                    sx={{ p: 0.25, '& .MuiSvgIcon-root': { fontSize: '0.9rem' } }}
-                  />
-                }
-                label={
-                  <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                    Seleziona tutte ({selectedFarmIds.length}/{countVisibleFarms()})
-                  </Typography>
-                }
-              />
-            </Box>
-            
             <List sx={{ 
               maxHeight: "400px", 
               overflow: "auto",
@@ -685,10 +747,12 @@ const DialogoSelezioneFarm: React.FC<DialogoSelezioneFarmProps> = ({
                       />
                     </ListItem>
                     
-                    {farmsFiltrate.map((farm) => (
+                    {farmsFiltrate.map((farm) => {
+                      const isAssigned = isFarmAssigned(farm.id);
+                      return (
                       <Box
                         key={farm.id}
-                        onClick={() => handleToggleFarm(farm.id)}
+                        onClick={() => !isAssigned && handleToggleFarm(farm.id)}
                         sx={{
                           pl: 0.5,
                           borderLeft: "1px solid rgba(0, 0, 0, 0.12)",
@@ -697,25 +761,61 @@ const DialogoSelezioneFarm: React.FC<DialogoSelezioneFarmProps> = ({
                           alignItems: 'center',
                           py: 0.25,
                           mb: 0.25,
-                          cursor: 'pointer',
-                          bgcolor: selectedFarmIds.includes(farm.id) ? "rgba(25, 118, 210, 0.08)" : 'transparent',
+                          cursor: isAssigned ? 'default' : 'pointer',
+                          bgcolor: isAssigned 
+                            ? "rgba(76, 175, 80, 0.1)" // Verde chiaro per le farm già assegnate
+                            : selectedFarmIds.includes(farm.id) 
+                              ? "rgba(25, 118, 210, 0.08)" 
+                              : 'transparent',
                           '&:hover': {
-                            bgcolor: selectedFarmIds.includes(farm.id) ? "rgba(25, 118, 210, 0.12)" : "rgba(0, 0, 0, 0.04)",
+                            bgcolor: isAssigned 
+                              ? "rgba(76, 175, 80, 0.1)" // Non cambia al passaggio del mouse
+                              : selectedFarmIds.includes(farm.id) 
+                                ? "rgba(25, 118, 210, 0.12)" 
+                                : "rgba(0, 0, 0, 0.04)",
                           },
                           filter: farm.stato === "inattivo" ? "grayscale(100%)" : "none",
+                          borderRadius: '4px',
                         }}
                       >
-                        <Checkbox
-                          checked={selectedFarmIds.includes(farm.id)}
-                          onChange={() => handleToggleFarm(farm.id)}
-                          onClick={(e) => e.stopPropagation()}
-                          size="small"
-                          sx={{ p: 0.25, '& .MuiSvgIcon-root': { fontSize: '0.9rem' } }}
-                        />
+                        {!isAssigned && (
+                          <Checkbox
+                            checked={selectedFarmIds.includes(farm.id)}
+                            onChange={() => handleToggleFarm(farm.id)}
+                            onClick={(e) => e.stopPropagation()}
+                            size="small"
+                            sx={{ p: 0.25, '& .MuiSvgIcon-root': { fontSize: '0.9rem' } }}
+                          />
+                        )}
+                        {isAssigned && (
+                          <Box 
+                            sx={{ 
+                              width: 20, 
+                              height: 20, 
+                              display: 'flex', 
+                              justifyContent: 'center', 
+                              alignItems: 'center', 
+                              color: 'success.main',
+                              ml: 0.3,
+                              mr: 0.3
+                            }}
+                          >
+                            <Box 
+                              component="span" 
+                              sx={{ 
+                                fontSize: '0.8rem', 
+                                fontWeight: 'bold', 
+                                color: '#4caf50'
+                              }}
+                            >
+                              ✓
+                            </Box>
+                          </Box>
+                        )}
                         <Avatar 
                           sx={{ 
-                            bgcolor: 'rgb(33, 150, 243, 0.1)',
-                            color: 'rgb(33, 150, 243)',
+                            bgcolor: isAssigned ? 'rgba(76, 175, 80, 0.1)' : 'rgb(33, 150, 243, 0.1)',
+                            color: isAssigned ? '#4caf50' : 'rgb(33, 150, 243)',
                             width: 20,
                             height: 20,
                             fontSize: '0.7rem',
@@ -726,10 +826,63 @@ const DialogoSelezioneFarm: React.FC<DialogoSelezioneFarmProps> = ({
                           {farm.livello}
                         </Avatar>
                         <Box sx={{ flexGrow: 1 }}>
-                          <Typography variant="body2">{farm.nome}</Typography>
+                          <Typography 
+                            variant="body2"
+                            sx={{
+                              color: isAssigned ? '#4caf50' : 'inherit', 
+                              fontWeight: isAssigned ? 'bold' : 'normal'
+                            }}
+                          >
+                            {farm.nome}
+                            {isAssigned && (
+                              <Typography 
+                                component="span"
+                                variant="caption"
+                                sx={{ 
+                                  ml: 0.5,
+                                  color: 'success.main',
+                                  fontSize: '0.7rem'
+                                }}
+                              >
+                                (già assegnato)
+                              </Typography>
+                            )}
+                          </Typography>
+                          
+                          {/* Mostra i derby tags associati alla farm solo se lo switch è attivato */}
+                          {mostraTagDerby && farm.derby_tags && farm.derby_tags.length > 0 && (
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.2 }}>
+                              {farm.derby_tags.map((tagId) => {
+                                // Trova il derby corrispondente all'ID del tag
+                                const derbyInfo = derby.find(d => d.id === tagId);
+                                if (!derbyInfo) return null;
+                                
+                                return (
+                                  <Tooltip key={tagId} title={derbyInfo.nome} arrow placement="top">
+                                    <Chip
+                                      label={derbyInfo.nome}
+                                      size="small"
+                                      sx={{ 
+                                        height: 16,
+                                        fontSize: '0.62rem',
+                                        backgroundColor: derbyInfo.colore || 'primary.main',
+                                        color: 'white',
+                                        '& .MuiChip-label': { 
+                                          px: 0.6,
+                                          py: 0,
+                                          lineHeight: 1.2
+                                        }
+                                      }}
+                                    />
+                                  </Tooltip>
+                                );
+                              })}
+                            </Box>
+                          )}
                         </Box>
                       </Box>
-                    ))}
+                      );
+                    })}
                     
                     <Divider component="li" sx={{ my: 0.25 }} />
                   </React.Fragment>
@@ -741,13 +894,21 @@ const DialogoSelezioneFarm: React.FC<DialogoSelezioneFarmProps> = ({
       </DialogContent>
       
       <DialogActions>
+        <Button 
+          variant="outlined" 
+          onClick={handleResetFilters} 
+          size="small"
+          disabled={!searchQuery && !selectedDerby && !mostraFarmInattive && !mostraTagDerby && mostraGiaAssegnati}
+        >
+          Resetta filtri
+        </Button>
         <Button onClick={onClose} color="inherit">
           Annulla
         </Button>
         <Button 
-          onClick={handleConfirm} 
-          color="primary" 
-          variant="contained"
+          onClick={handleConfirm}
+          variant="contained" 
+          color="primary"
           disabled={selectedFarmIds.length === 0}
         >
           Assegna ({selectedFarmIds.length})

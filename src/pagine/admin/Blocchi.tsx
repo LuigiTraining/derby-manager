@@ -26,7 +26,15 @@ import EditIcon from '@mui/icons-material/Edit';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import CloseIcon from '@mui/icons-material/Close';
 import Layout from '../../componenti/layout/Layout';
-import { collection, query, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { collection, query, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore'
+import { 
+  getDocWithRateLimit, 
+  getDocsWithRateLimit, 
+  setDocWithRateLimit,
+  updateDocWithRateLimit,
+  deleteDocWithRateLimit,
+  addDocWithRateLimit
+} from '../../configurazione/firebase';;
 import { db } from '../../configurazione/firebase';
 import { Farm } from '../../tipi/giocatore';
 import { Derby } from '../../tipi/derby';
@@ -74,7 +82,7 @@ export default function Blocchi() {
       try {
         // Carica i blocchi
         const blocchiQuery = query(collection(db, 'blocchi'));
-        const blocchiSnapshot = await getDocs(blocchiQuery);
+        const blocchiSnapshot = await getDocsWithRateLimit(blocchiQuery);
         const blocchiData = blocchiSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
@@ -83,7 +91,7 @@ export default function Blocchi() {
 
         // Carica i giocatori e le loro farm
         const giocatoriQuery = query(collection(db, 'utenti'));
-        const giocatoriSnapshot = await getDocs(giocatoriQuery);
+        const giocatoriSnapshot = await getDocsWithRateLimit(giocatoriQuery);
         const farmsData: Farm[] = [];
         
         giocatoriSnapshot.docs.forEach(doc => {
@@ -119,7 +127,7 @@ export default function Blocchi() {
 
         // Carica i derby
         const derbyQuery = query(collection(db, 'derby'));
-        const derbySnapshot = await getDocs(derbyQuery);
+        const derbySnapshot = await getDocsWithRateLimit(derbyQuery);
         const derbyData = derbySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
@@ -138,7 +146,7 @@ export default function Blocchi() {
     try {
       if (editingBlocco) {
         // Aggiorna blocco esistente
-        await updateDoc(doc(db, 'blocchi', editingBlocco.id), {
+        await updateDocWithRateLimit(doc(db, 'blocchi', editingBlocco.id), {
           nome: nuovoBlocco.nome,
           immagine: nuovoBlocco.immagine,
         });
@@ -150,7 +158,7 @@ export default function Blocchi() {
         ));
       } else {
         // Crea nuovo blocco
-        const docRef = await addDoc(collection(db, 'blocchi'), {
+        const docRef = await addDocWithRateLimit(collection(db, 'blocchi'), {
           nome: nuovoBlocco.nome,
           immagine: nuovoBlocco.immagine || '',
           farms: [],
@@ -173,7 +181,7 @@ export default function Blocchi() {
   // Gestione eliminazione blocco
   const handleDeleteBlocco = async (bloccoId: string) => {
     try {
-      await deleteDoc(doc(db, 'blocchi', bloccoId));
+      await deleteDocWithRateLimit(doc(db, 'blocchi', bloccoId));
       setBlocchi(prev => prev.filter(b => b.id !== bloccoId));
     } catch (error) {
       console.error('Errore nell\'eliminazione del blocco:', error);
@@ -194,7 +202,7 @@ export default function Blocchi() {
 
       const nuoveFarms = [...blocco.farms, nuovaFarm];
 
-      await updateDoc(doc(db, 'blocchi', bloccoId), {
+      await updateDocWithRateLimit(doc(db, 'blocchi', bloccoId), {
         farms: nuoveFarms,
       });
 
@@ -218,7 +226,7 @@ export default function Blocchi() {
 
       const nuoveFarms = blocco.farms.filter(f => f.farm_id !== farmId);
 
-      await updateDoc(doc(db, 'blocchi', bloccoId), {
+      await updateDocWithRateLimit(doc(db, 'blocchi', bloccoId), {
         farms: nuoveFarms,
       });
 

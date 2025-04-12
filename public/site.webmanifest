@@ -1,0 +1,19 @@
+{
+  "name": "Perchè No",
+  "short_name": "Perchè No",
+  "icons": [
+    {
+      "src": "/images/logo_percheno_vicinato.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/images/logo_percheno_vicinato.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "theme_color": "#0070d0",
+  "background_color": "#0070d0",
+  "display": "standalone"
+} 

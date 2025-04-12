@@ -77,7 +77,15 @@ import {
   onSnapshot,
   updateDoc,
   writeBatch,
-} from "firebase/firestore";
+} from "firebase/firestore"
+import { 
+  getDocWithRateLimit, 
+  getDocsWithRateLimit, 
+  setDocWithRateLimit,
+  updateDocWithRateLimit,
+  deleteDocWithRateLimit,
+  addDocWithRateLimit
+} from '../../configurazione/firebase';;
 import { db } from "../../configurazione/firebase";
 import { Giocatore, Farm, StatoFarm } from "../../tipi/giocatore";
 import UploadImmagine from "../../componenti/comune/UploadImmagine";
@@ -314,7 +322,7 @@ export default function GestioneGiocatori() {
   // Carica i derby dal database
   const caricaDerby = async () => {
     try {
-      const derbySnapshot = await getDocs(collection(db, "derby"));
+      const derbySnapshot = await getDocsWithRateLimit(collection(db, "derby"));
       const derbyData = derbySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
@@ -624,7 +632,7 @@ export default function GestioneGiocatori() {
 
       if (editingGiocatore) {
         // Aggiornamento giocatore esistente
-        await updateDoc(doc(db, "utenti", editingGiocatore.id), cleanData);
+        await updateDocWithRateLimit(doc(db, "utenti", editingGiocatore.id), cleanData);
         setSuccess("Giocatore aggiornato con successo");
       } else {
         // Creazione nuovo giocatore
@@ -636,7 +644,7 @@ export default function GestioneGiocatori() {
           vicinati: [],
           id: crypto.randomUUID(),
         };
-        await setDoc(doc(db, "utenti", pin.toString()), nuovoGiocatore);
+        await setDocWithRateLimit(doc(db, "utenti", pin.toString()), nuovoGiocatore);
         setSuccess("Giocatore creato con successo");
       }
 
@@ -753,7 +761,7 @@ export default function GestioneGiocatori() {
       const farmsAggiornate = [...giocatore.farms];
       farmsAggiornate[farmIndex] = farmAggiornata;
 
-      await setDoc(doc(db, "utenti", giocatore.pin.toString()), {
+      await setDocWithRateLimit(doc(db, "utenti", giocatore.pin.toString()), {
         ...giocatore,
         farms: farmsAggiornate,
       });
@@ -1066,14 +1074,14 @@ export default function GestioneGiocatori() {
           : "coordinatore";
       const giocatoreRef = doc(db, "utenti", selectedGiocatore.id);
 
-      await updateDoc(giocatoreRef, {
+      await updateDocWithRateLimit(giocatoreRef, {
         ruolo: nuovoRuolo,
       });
 
       setSuccess(
         `Giocatore ${
           nuovoRuolo === "coordinatore"
-            ? "promosso a coordinatore"
+            ? "promosso a Co-Leader"
             : "degradato a giocatore"
         } con successo`
       );
@@ -1104,14 +1112,14 @@ export default function GestioneGiocatori() {
         selectedGiocatore.ruolo === "moderatore" ? "giocatore" : "moderatore";
       const giocatoreRef = doc(db, "utenti", selectedGiocatore.id);
 
-      await updateDoc(giocatoreRef, {
+      await updateDocWithRateLimit(giocatoreRef, {
         ruolo: nuovoRuolo,
       });
 
       setSuccess(
         `Giocatore ${
           nuovoRuolo === "moderatore"
-            ? "promosso a moderatore"
+            ? "promosso a Gestore"
             : "degradato a giocatore"
         } con successo`
       );
@@ -1130,7 +1138,7 @@ export default function GestioneGiocatori() {
       await eliminaAssegnazioniGiocatore(selectedGiocatore);
       
       // Poi eliminiamo il giocatore
-      await deleteDoc(doc(db, "utenti", selectedGiocatore.id));
+      await deleteDocWithRateLimit(doc(db, "utenti", selectedGiocatore.id));
       setSuccess("Giocatore eliminato con successo");
       caricaGiocatori();
       setOpenDeleteDialog(false);
@@ -1162,7 +1170,7 @@ export default function GestioneGiocatori() {
       
       // 1. Eliminazione delle assegnazioni
       const assegnazioniRef = collection(db, "assegnazioni");
-      const assegnazioniSnapshot = await getDocs(assegnazioniRef);
+      const assegnazioniSnapshot = await getDocsWithRateLimit(assegnazioniRef);
       
       assegnazioniSnapshot.forEach((doc) => {
         const assegnazione = doc.data();
@@ -1176,7 +1184,7 @@ export default function GestioneGiocatori() {
       
       // 2. Eliminazione dei progressi
       const progressiRef = collection(db, "progressi");
-      const progressiSnapshot = await getDocs(progressiRef);
+      const progressiSnapshot = await getDocsWithRateLimit(progressiRef);
       
       console.log(`Esaminando ${progressiSnapshot.size} documenti di progressi`);
       
@@ -1225,7 +1233,7 @@ export default function GestioneGiocatori() {
   // Funzione per ricaricare i giocatori
   const caricaGiocatori = async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, "utenti"));
+      const querySnapshot = await getDocsWithRateLimit(collection(db, "utenti"));
       const giocatoriData = querySnapshot.docs
         .map((doc) => ({
           ...(doc.data() as Giocatore),
@@ -1263,7 +1271,7 @@ export default function GestioneGiocatori() {
         stato: nuovoStato,
       };
 
-      await setDoc(doc(db, "utenti", giocatore.id), {
+      await setDocWithRateLimit(doc(db, "utenti", giocatore.id), {
         ...giocatore,
         farms: farmsAggiornate,
       });
@@ -1664,8 +1672,11 @@ export default function GestioneGiocatori() {
                                 lineHeight: 1,
                               }}
                             >
-                              {giocatore.ruolo.charAt(0).toUpperCase() +
-                                giocatore.ruolo.slice(1)}
+                              {giocatore.ruolo === "coordinatore" 
+                                ? "Co-Leader"
+                                : giocatore.ruolo === "moderatore" 
+                                  ? "Gestore" 
+                                  : giocatore.ruolo.charAt(0).toUpperCase() + giocatore.ruolo.slice(1)}
                             </Typography>
                           )}
                         </Box>
@@ -1867,10 +1878,11 @@ export default function GestioneGiocatori() {
                             </Box>
                           )}
 
-                          {giocatore.note && canViewFullDetails(giocatore) && (
+                          {/* Presentazione visibile a tutti */}
+                          {giocatore.note && (
                             <Box>
                               <Typography variant="caption" sx={{ fontWeight: 600 }}>
-                                Note:
+                                Presentazione:
                               </Typography>
                               <Box sx={{ mt: 0.5 }}>{giocatore.note}</Box>
                             </Box>
@@ -2881,8 +2893,8 @@ export default function GestioneGiocatori() {
                 </ListItemIcon>
                 <ListItemText>
                   {selectedGiocatore.ruolo === "coordinatore"
-                    ? "Rimuovi da coordinatore"
-                    : "Promuovi a coordinatore"}
+                    ? "Rimuovi da Co-Leader"
+                    : "Promuovi a Co-Leader"}
                 </ListItemText>
               </MenuItem>
             )}
@@ -2897,8 +2909,8 @@ export default function GestioneGiocatori() {
                 </ListItemIcon>
                 <ListItemText>
                   {selectedGiocatore.ruolo === "moderatore"
-                    ? "Rimuovi da moderatore"
-                    : "Promuovi a moderatore"}
+                    ? "Rimuovi da Gestore"
+                    : "Promuovi a Gestore"}
                 </ListItemText>
               </MenuItem>
             )}

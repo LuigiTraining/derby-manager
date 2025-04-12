@@ -18,7 +18,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@types/cors": "^2.8.17",
     "@types/web-push": "^3.6.4",
+    "cors": "^2.8.5",
     "firebase-admin": "^11.11.1",
     "firebase-functions": "^4.5.0",
     "web-push": "^3.6.7"

@@ -59,7 +59,9 @@ const PresetsAssegnazioniDropdown: React.FC<PresetsAssegnazioniDropdownProps> = 
     setLoading(true);
     try {
       const presetsCaricati = await presetsService.caricaPresets();
-      setPresets(presetsCaricati);
+      // Ordino i preset alfabeticamente per nome
+      const presetsOrdinati = [...presetsCaricati].sort((a, b) => a.nome.localeCompare(b.nome));
+      setPresets(presetsOrdinati);
     } catch (error) {
       console.error('Errore nel caricamento dei preset:', error);
     } finally {
@@ -70,6 +72,8 @@ const PresetsAssegnazioniDropdown: React.FC<PresetsAssegnazioniDropdownProps> = 
   const handleClick = (event: React.MouseEvent<HTMLElement>) => {
     if (!disabilitato) {
       setAnchorEl(event.currentTarget);
+      // Forza l'aggiornamento dei preset da Firebase ogni volta che si apre il menu
+      caricaPresets();
     }
   };
   
@@ -110,6 +114,13 @@ const PresetsAssegnazioniDropdown: React.FC<PresetsAssegnazioniDropdownProps> = 
     setLoading(true);
     try {
       if (presetDaModificare) {
+        console.log("Aggiornamento preset esistente:", {
+          id: presetDaModificare.id,
+          nome,
+          descrizione,
+          incarichi: incarichi.length
+        });
+        
         // Aggiorna il preset esistente
         const presetAggiornato = await presetsService.aggiornaPreset(presetDaModificare.id, {
           nome,
@@ -118,6 +129,8 @@ const PresetsAssegnazioniDropdown: React.FC<PresetsAssegnazioniDropdownProps> = 
         });
         
         if (presetAggiornato) {
+          console.log("Preset aggiornato con successo:", presetAggiornato);
+          
           // Aggiorna la lista dei preset
           await caricaPresets();
           
@@ -125,14 +138,24 @@ const PresetsAssegnazioniDropdown: React.FC<PresetsAssegnazioniDropdownProps> = 
           if (presetAttivo && presetAttivo.id === presetDaModificare.id) {
             onSelezionaPreset(presetAggiornato);
           }
+        } else {
+          console.error("Errore nell'aggiornamento del preset: risposta nulla");
         }
       } else {
+        console.log("Creazione nuovo preset:", {
+          nome,
+          descrizione,
+          incarichi: incarichi.length
+        });
+        
         // Crea un nuovo preset
         const nuovoPreset = await presetsService.creaPreset({
           nome,
           descrizione,
           incarichi
         });
+        
+        console.log("Nuovo preset creato:", nuovoPreset);
         
         // Aggiorna la lista dei preset
         await caricaPresets();

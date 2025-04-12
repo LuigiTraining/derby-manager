@@ -66,15 +66,16 @@ export default function UploadImmagine({
     setError('');
 
     try {
-      // Se c'è già un'immagine, eliminiamola
+      // Se c'è già un'immagine, proviamo ad eliminarla
       if (urlImmagine) {
         // Verifica se l'URL è da Firebase Storage (non eliminare URL esterni)
         if (urlImmagine.includes('firebasestorage.googleapis.com')) {
-          const vecchioRef = ref(storage, urlImmagine);
           try {
+            const vecchioRef = ref(storage, urlImmagine);
             await deleteObject(vecchioRef);
           } catch (error) {
-            console.error('Errore nell\'eliminazione della vecchia immagine:', error);
+            // Ignoriamo l'errore se l'immagine non esiste più
+            console.warn('Immagine precedente non trovata:', error);
           }
         }
       }
@@ -114,8 +115,13 @@ export default function UploadImmagine({
     try {
       // Verifica se l'URL è da Firebase Storage
       if (urlImmagine.includes('firebasestorage.googleapis.com')) {
-        const imageRef = ref(storage, urlImmagine);
-        await deleteObject(imageRef);
+        try {
+          const imageRef = ref(storage, urlImmagine);
+          await deleteObject(imageRef);
+        } catch (error) {
+          // Ignoriamo l'errore se l'immagine non esiste più
+          console.warn('Immagine già eliminata:', error);
+        }
       }
       onImmagineEliminata();
     } catch (error) {

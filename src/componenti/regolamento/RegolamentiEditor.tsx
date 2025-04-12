@@ -1,67 +1,36 @@
-import React, { useEffect, useState } from 'react';
-import {
-  Box,
-  Paper,
-  Typography,
-  IconButton,
-  Tooltip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  TextField,
-  Autocomplete,
-} from '@mui/material';
+import React from 'react';
 import { Editor } from '@tinymce/tinymce-react';
-import { db, storage } from '../../configurazione/firebase';
-import { doc, updateDoc, collection, getDocs } from 'firebase/firestore'
-import { 
-  getDocWithRateLimit, 
-  getDocsWithRateLimit, 
-  setDocWithRateLimit,
-  updateDocWithRateLimit,
-  deleteDocWithRateLimit,
-  addDocWithRateLimit
-} from '../../configurazione/firebase';;
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { Box, IconButton, Tooltip } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
-import LinkIcon from '@mui/icons-material/Link';
-import FormatListNumberedIcon from '@mui/icons-material/FormatListNumbered';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { useAuth } from '../autenticazione/AuthContext';
+import { collection, getDocs } from 'firebase/firestore'
+import { 
+  getDocsWithRateLimit, 
+  db, 
+  storage 
+} from '../../configurazione/firebase';
 import { config } from '../../configurazione/config';
 
-interface WikiEditorProps {
+interface RegolamentiEditorProps {
   initialContent: string;
-  pagePath: string;
+  sectionId: string;
   onSave: (content: string) => Promise<void>;
   readOnly?: boolean;
 }
 
-export default function WikiEditor({
+export default function RegolamentiEditor({
   initialContent,
-  pagePath,
+  sectionId,
   onSave,
   readOnly = false
-}: WikiEditorProps) {
-  const [content, setContent] = useState(initialContent);
-  const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
-  const [availablePages, setAvailablePages] = useState<string[]>([]);
-  const [selectedLink, setSelectedLink] = useState('');
-  const [linkText, setLinkText] = useState('');
-  const [editorInstance, setEditorInstance] = useState<any>(null);
+}: RegolamentiEditorProps) {
+  const [content, setContent] = React.useState(initialContent);
+  const [editorInstance, setEditorInstance] = React.useState<any>(null);
+  const { currentUser } = useAuth();
+  const [isLoading, setIsLoading] = React.useState(false);
 
-  // Carica le pagine disponibili per i link interni
-  useEffect(() => {
-    const loadAvailablePages = async () => {
-      const pagesSnapshot = await getDocsWithRateLimit(collection(db, 'wiki_pages'));
-      const pages = pagesSnapshot.docs.map(doc => doc.id);
-      setAvailablePages(pages);
-    };
-
-    loadAvailablePages();
-  }, []);
-
-  // Configurazione avanzata dell'editor
+  // Configurazione dell'editor
   const editorConfig = {
     height: 500,
     menubar: true,
@@ -108,6 +77,17 @@ export default function WikiEditor({
       .clickable-text:active { 
         background-color: #d5d5d5;
       }
+      /* Stili specifici per i regolamenti */
+      .regolamento-articolo {
+        margin-bottom: 1rem;
+        padding: 0.5rem;
+        border-left: 3px solid #2196f3;
+        background-color: #f5f5f5;
+      }
+      .regolamento-sezione {
+        margin-bottom: 0.5rem;
+        font-weight: bold;
+      }
     `,
     branding: false,
     promotion: false,
@@ -132,17 +112,16 @@ export default function WikiEditor({
         { title: 'Citazione', format: 'blockquote' },
         { title: 'Codice', format: 'pre' }
       ]},
-      { title: 'Contenitori', items: [
-        { title: 'Sezione', block: 'section', wrapper: true },
-        { title: 'Articolo', block: 'article', wrapper: true },
-        { title: 'Div', block: 'div', wrapper: true }
+      { title: 'Regolamento', items: [
+        { title: 'Articolo', block: 'div', classes: 'regolamento-articolo', wrapper: true },
+        { title: 'Sezione', block: 'div', classes: 'regolamento-sezione', wrapper: true }
       ]}
     ],
     domain: config.tinymce.domain,
     setup: (editor: any) => {
       setEditorInstance(editor);
       
-      // Aggiungi il pulsante personalizzato
+      // Aggiungi il pulsante per testo copiabile
       editor.ui.registry.addButton('copiabile', {
         text: 'Testo Copiabile',
         tooltip: 'Rendi il testo selezionato copiabile con un tap',
@@ -191,44 +170,12 @@ export default function WikiEditor({
         const newContent = editor.getContent();
         setContent(newContent);
       });
-
-      // Aggiungi il gestore di eventi globale per gli elementi copiabili
-      editor.on('init', () => {
-        const script = `
-          document.addEventListener('click', function(e) {
-            if (e.target.classList.contains('clickable-text')) {
-              const textToCopy = e.target.getAttribute('data-copyable');
-              if (textToCopy) {
-                navigator.clipboard.writeText(textToCopy).then(() => {
-                  const msg = document.createElement('div');
-                  msg.textContent = 'Copiato!';
-                  msg.style.position = 'fixed';
-                  msg.style.bottom = '20px';
-                  msg.style.left = '50%';
-                  msg.style.transform = 'translateX(-50%)';
-                  msg.style.background = '#333';
-                  msg.style.color = 'white';
-                  msg.style.padding = '10px 20px';
-                  msg.style.borderRadius = '4px';
-                  msg.style.zIndex = '9999';
-                  document.body.appendChild(msg);
-                  setTimeout(() => msg.remove(), 2000);
-                });
-              }
-            }
-          });
-        `;
-        editor.dom.doc.head.appendChild(editor.dom.create('script', {
-          type: 'text/javascript',
-          text: script
-        }));
-      });
     },
     images_upload_handler: async (blobInfo: any) => {
       try {
         const file = blobInfo.blob();
-        const fileName = `${pagePath}/${Date.now()}_${blobInfo.filename()}`;
-        const storageRef = ref(storage, `wiki_images/${fileName}`);
+        const fileName = `${sectionId}/${Date.now()}_${blobInfo.filename()}`;
+        const storageRef = ref(storage, `regolamenti_images/${fileName}`);
         
         // Upload del file
         await uploadBytes(storageRef, file);
@@ -249,79 +196,50 @@ export default function WikiEditor({
       { title: 'Arrotondata', value: 'rounded' },
       { title: 'Con bordo', value: 'img-with-border' }
     ],
-    automatic_uploads: true,
-    images_reuse_filename: true,
-    images_upload_credentials: true,
+    readonly: readOnly
   };
 
-  const handleInsertInternalLink = () => {
-    if (!selectedLink || !linkText || !editorInstance) return;
-
-    const linkHtml = `<a href="/wiki/${selectedLink}" class="internal-link">${linkText}</a>`;
-    editorInstance.insertContent(linkHtml);
-    setIsLinkDialogOpen(false);
-    setSelectedLink('');
-    setLinkText('');
+  const handleSave = async () => {
+    if (readOnly) return;
+    
+    setIsLoading(true);
+    try {
+      await onSave(content);
+    } catch (error) {
+      console.error('Errore durante il salvataggio:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <Box>
-      <Box sx={{ 
-        border: 1, 
-        borderColor: 'divider',
-        borderRadius: 1,
-        overflow: 'hidden'
-      }}>
-        <Editor
-          apiKey={config.tinymce.apiKey}
-          value={content}
-          onEditorChange={(newContent) => setContent(newContent)}
-          init={editorConfig}
-          disabled={readOnly}
-        />
-      </Box>
-
-      <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-        <Button 
-          variant="contained" 
-          color="primary" 
-          onClick={() => onSave(content)}
-          startIcon={<SaveIcon />}
-        >
-          Salva
-        </Button>
-      </Box>
-
-      {/* Dialog per i link interni */}
-      <Dialog open={isLinkDialogOpen} onClose={() => setIsLinkDialogOpen(false)}>
-        <DialogTitle>Inserisci Link Interno</DialogTitle>
-        <DialogContent>
-          <Box sx={{ pt: 2 }}>
-            <TextField
-              fullWidth
-              label="Testo del link"
-              value={linkText}
-              onChange={(e) => setLinkText(e.target.value)}
-              sx={{ mb: 2 }}
-            />
-            <Autocomplete
-              fullWidth
-              value={selectedLink}
-              onChange={(_, newValue) => setSelectedLink(newValue || '')}
-              options={availablePages}
-              renderInput={(params) => (
-                <TextField {...params} label="Pagina di destinazione" />
-              )}
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setIsLinkDialogOpen(false)}>Annulla</Button>
-          <Button onClick={handleInsertInternalLink} variant="contained">
-            Inserisci
-          </Button>
-        </DialogActions>
-      </Dialog>
+    <Box sx={{ position: 'relative' }}>
+      <Editor
+        apiKey={config.tinymce.apiKey}
+        init={editorConfig}
+        initialValue={initialContent}
+        disabled={readOnly || isLoading}
+      />
+      
+      {!readOnly && (
+        <Box sx={{ position: 'absolute', top: 0, right: 0, zIndex: 10 }}>
+          <Tooltip title="Salva">
+            <IconButton 
+              onClick={handleSave}
+              disabled={isLoading}
+              size="large"
+              sx={{ 
+                backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                '&:hover': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.9)'
+                }
+              }}
+            >
+              <SaveIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      )}
     </Box>
   );
 } 

@@ -1,6 +1,7 @@
 import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { inviaNotifica, inviaNotificaATutti, onNuovoAnnuncio } from './notifiche';
+import * as cors from 'cors';
 
 // Inizializza l'app se non è già inizializzata
 if (!admin.apps.length) {
@@ -9,8 +10,97 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
+// Configura CORS
+const corsHandler = cors({
+  origin: [
+    'http://localhost:5173',  // Development server
+    'http://localhost:3000',  // Altro possibile development server
+    'https://derby-manager-perche-no.web.app',  // Dominio principale
+    'https://derby-manager-perche-no.firebaseapp.com', // Altro dominio Firebase 
+  ],
+  methods: ['GET', 'POST'],
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization']
+});
+
 // Esporta le funzioni di notifica
 export { inviaNotifica, inviaNotificaATutti, onNuovoAnnuncio };
+
+// Funzione HTTP per registrare richieste per rate limiting
+export const recordRateLimitRequest = functions.https.onRequest(async (req, res) => {
+  // Gestisci CORS
+  return corsHandler(req, res, async () => {
+    const ip = req.ip || 'unknown';
+    const timeWindow = Math.floor(Date.now() / (1000 * 60 * 10)); // Finestra di 10 minuti
+    const docRef = db.collection('system').doc('rate_limiting').collection(timeWindow.toString()).doc(ip);
+    
+    try {
+      // Ottieni il documento corrente o crea un nuovo documento con conteggio 0
+      const doc = await docRef.get();
+      
+      if (!doc.exists) {
+        // Crea nuovo documento con count=1
+        await docRef.set({ count: 1, firstRequest: admin.firestore.FieldValue.serverTimestamp() });
+      } else {
+        // Incrementa il conteggio
+        await docRef.update({ 
+          count: admin.firestore.FieldValue.increment(1),
+          lastRequest: admin.firestore.FieldValue.serverTimestamp() 
+        });
+      }
+      
+      // Imposta una TTL per eliminare automaticamente i documenti dopo 20 minuti
+      setTimeout(async () => {
+        try {
+          await docRef.delete();
+        } catch (e) {
+          console.error('Errore durante l\'eliminazione del documento di rate limiting:', e);
+        }
+      }, 20 * 60 * 1000);
+      
+      res.status(200).send({ success: true });
+    } catch (error) {
+      console.error('Errore durante il rate limiting:', error);
+      res.status(500).send({ success: false, error: 'Errore interno' });
+    }
+  });
+});
+
+// Funzione di pulizia per documenti di rate limiting scaduti (esegui ogni ora)
+export const cleanupRateLimitingDocs = functions.pubsub
+  .schedule('0 * * * *') // Ogni ora
+  .timeZone('Europe/Rome')
+  .onRun(async (context) => {
+    const currentWindow = Math.floor(Date.now() / (1000 * 60 * 10));
+    
+    try {
+      // Ottieni tutte le collezioni in system/rate_limiting
+      const collections = await db.collection('system').doc('rate_limiting').listCollections();
+      
+      for (const collection of collections) {
+        const windowId = parseInt(collection.id);
+        
+        // Se la finestra è scaduta (più vecchia di 20 minuti), elimina tutti i documenti
+        if (windowId < currentWindow - 2) {
+          const docsSnapshot = await collection.get();
+          
+          if (!docsSnapshot.empty) {
+            const batch = db.batch();
+            docsSnapshot.docs.forEach((doc) => {
+              batch.delete(doc.ref);
+            });
+            await batch.commit();
+            console.log(`Eliminati ${docsSnapshot.size} documenti dalla finestra di rate limiting ${windowId}`);
+          }
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Errore durante la pulizia dei documenti di rate limiting:', error);
+      return null;
+    }
+  });
 
 // Funzione che viene eseguita ogni 10 minuti
 export const manageDerbyAutomation = functions.pubsub

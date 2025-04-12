@@ -142,10 +142,12 @@ export default function ListaIncarichiCitta({
         display: 'flex', 
         flexDirection: 'column',
         mt: 0,
+        width: '100%',
         // Rimuovo qualsiasi padding o margin che potrebbe causare spazi
         '& > *': { 
           mb: 0, 
-          borderRadius: 0 
+          borderRadius: 0,
+          width: '100%'
         }
       }}>
         {incarichi.map((incarico, index) => {
@@ -187,22 +189,22 @@ export default function ListaIncarichiCitta({
   };
 
   return (
-    <Box>
+    <Box sx={{ width: '100%', maxWidth: '100%' }}>
       {incarichiCittaFiltrati.length === 0 ? (
         <Typography variant="body1" sx={{ textAlign: "center", my: 4 }}>
           {t('derby.nessun_incarico_citta_trovato')}
         </Typography>
       ) : (
-        <Box>
+        <Box sx={{ width: '100%' }}>
           {/* Sezione VISITATORI */}
           {incarichiVisitatori.length > 0 && (
-            <Box>
+            <Box sx={{ width: '100%' }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 'bold', px: 2, pt: 1, pb: 0.5 }}>
                 VISITATORI
-                          </Typography>
+              </Typography>
               {renderIncarichi(incarichiVisitatori, 'visitatore')}
-                          </Box>
-                        )}
+            </Box>
+          )}
 
           {/* Divisore tra VISITATORI e EDIFICI */}
           {incarichiVisitatori.length > 0 && incarichiEdifici.length > 0 && (
@@ -211,13 +213,13 @@ export default function ListaIncarichiCitta({
 
           {/* Sezione EDIFICI */}
           {incarichiEdifici.length > 0 && (
-            <Box>
+            <Box sx={{ width: '100%' }}>
               <Typography variant="subtitle1" sx={{ fontWeight: 'bold', px: 2, pt: 1, pb: 0.5 }}>
                 EDIFICI
-                          </Typography>
+              </Typography>
               {renderIncarichi(incarichiEdifici, 'edificio')}
-                        </Box>
-                      )}
+            </Box>
+          )}
         </Box>
       )}
     </Box>

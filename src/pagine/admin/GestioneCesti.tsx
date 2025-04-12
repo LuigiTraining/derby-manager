@@ -52,7 +52,15 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import SearchIcon from '@mui/icons-material/Search';
 import CloseIcon from '@mui/icons-material/Close';
 import Layout from '../../componenti/layout/Layout';
-import { collection, getDocs, doc, setDoc, deleteDoc, query, where } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, deleteDoc, query, where } from 'firebase/firestore'
+import { 
+  getDocWithRateLimit, 
+  getDocsWithRateLimit, 
+  setDocWithRateLimit,
+  updateDocWithRateLimit,
+  deleteDocWithRateLimit,
+  addDocWithRateLimit
+} from '../../configurazione/firebase';;
 import { db } from '../../configurazione/firebase';
 import { Cesto, Incarico } from '../../tipi/incarico';
 import { ElementoCitta } from '../../tipi/citta';
@@ -126,7 +134,7 @@ export default function GestioneCesti() {
   // Carica i cesti dal database
   const caricaCesti = async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, 'cesti'));
+      const querySnapshot = await getDocsWithRateLimit(collection(db, 'cesti'));
       const cestiData = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -149,7 +157,7 @@ export default function GestioneCesti() {
   // Carica gli incarichi dal database
   const caricaIncarichi = async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, 'incarichi'));
+      const querySnapshot = await getDocsWithRateLimit(collection(db, 'incarichi'));
       const incarichiData = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -163,7 +171,7 @@ export default function GestioneCesti() {
   // Carica gli elementi città (visitatori)
   const caricaElementiCitta = async () => {
     try {
-      const querySnapshot = await getDocs(
+      const querySnapshot = await getDocsWithRateLimit(
         query(
           collection(db, 'incarichi_citta'),
           where('tipo', '==', 'visitatore'),
@@ -183,7 +191,7 @@ export default function GestioneCesti() {
   // Carica i derby dal database
   const caricaDerby = async () => {
     try {
-      const derbySnapshot = await getDocs(collection(db, 'derby'));
+      const derbySnapshot = await getDocsWithRateLimit(collection(db, 'derby'));
       const derbyData = derbySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -307,7 +315,7 @@ export default function GestioneCesti() {
       };
 
       // Salva il cesto nel database
-      await setDoc(doc(db, 'cesti', cestoData.id), cestoData);
+      await setDocWithRateLimit(doc(db, 'cesti', cestoData.id), cestoData);
 
       setSuccess(editingCesto ? 'Cesto aggiornato con successo!' : 'Cesto creato con successo!');
       handleCloseDialog();
@@ -659,7 +667,7 @@ export default function GestioneCesti() {
           </MenuItem>
           <MenuItem onClick={() => {
             if (anchorEl && window.confirm('Sei sicuro di voler eliminare questo cesto?')) {
-              deleteDoc(doc(db, 'cesti', anchorEl.id));
+              deleteDocWithRateLimit(doc(db, 'cesti', anchorEl.id));
               caricaCesti();
               setAnchorEl(null);
             }

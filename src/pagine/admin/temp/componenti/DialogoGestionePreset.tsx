@@ -26,8 +26,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
 import { PresetAssegnazioni } from '../../../../tipi/preset';
 import { creaPreset, aggiornaPreset } from '../../../../servizi/presetsService';
-import { Incarico } from '../../../../tipi/incarico';
-import { IncaricoCitta } from '../../../../tipi/incaricoCitta';
+import { Incarico, IncaricoCitta } from '../../../../tipi/incarico';
 import { Cesto } from '../../../../tipi/cesto';
 import { Edificio } from '../../../../tipi/edificio';
 
@@ -87,10 +86,16 @@ const DialogoGestionePreset: React.FC<DialogoGestionePresetProps> = ({
   const [filtroIncarichi, setFiltroIncarichi] = useState('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState(0);
+  const [ordinamentoAlfabetico, setOrdinamentoAlfabetico] = useState(true);
   
   // Gestione cambio tab
   const handleChangeTab = (event: React.SyntheticEvent, newValue: number) => {
     setTabValue(newValue);
+  };
+  
+  // Toggle ordinamento
+  const toggleOrdinamento = () => {
+    setOrdinamentoAlfabetico(prev => !prev);
   };
   
   // Reset del form quando si apre il dialogo o cambia il preset
@@ -108,6 +113,7 @@ const DialogoGestionePreset: React.FC<DialogoGestionePresetProps> = ({
       }
       
       if (preset) {
+        console.log("Impostazione dati preset:", preset);
         setNome(preset.nome);
         setDescrizione(preset.descrizione || '');
         setIncarichiSelezionati([...preset.incarichi]);
@@ -182,6 +188,23 @@ const DialogoGestionePreset: React.FC<DialogoGestionePresetProps> = ({
   };
   
   const handleSubmit = () => {
+    if (!nome.trim()) {
+      setErrorMessage("Il nome del preset è obbligatorio");
+      return;
+    }
+    
+    if (incarichiSelezionati.length === 0) {
+      setErrorMessage("Seleziona almeno un incarico");
+      return;
+    }
+    
+    console.log("Salvataggio preset:", {
+      nome,
+      descrizione,
+      incarichi: incarichiSelezionati,
+      isModifica: !!preset
+    });
+    
     onSalva(nome, descrizione, incarichiSelezionati);
   };
   
@@ -190,12 +213,14 @@ const DialogoGestionePreset: React.FC<DialogoGestionePresetProps> = ({
     ? incarichiDisponibili
         .filter(incarico => incarico.nome.toLowerCase().includes(filtroIncarichi.toLowerCase()))
         .sort((a, b) => {
-          // Prima per livello
-          if (a.livello_minimo !== b.livello_minimo) {
-            return a.livello_minimo - b.livello_minimo;
+          if (ordinamentoAlfabetico) {
+            return a.nome.localeCompare(b.nome);
+          } else {
+            if (a.livello_minimo !== b.livello_minimo) {
+              return a.livello_minimo - b.livello_minimo;
+            }
+            return a.nome.localeCompare(b.nome);
           }
-          // Poi alfabeticamente
-          return a.nome.localeCompare(b.nome);
         })
     : [];
     
@@ -204,12 +229,14 @@ const DialogoGestionePreset: React.FC<DialogoGestionePresetProps> = ({
     ? incarichiCittaDisponibili
         .filter(incarico => incarico.nome.toLowerCase().includes(filtroIncarichi.toLowerCase()))
         .sort((a, b) => {
-          // Prima per livello
-          if (a.livello_minimo !== b.livello_minimo) {
-            return a.livello_minimo - b.livello_minimo;
+          if (ordinamentoAlfabetico) {
+            return a.nome.localeCompare(b.nome);
+          } else {
+            if (a.livello_minimo !== b.livello_minimo) {
+              return a.livello_minimo - b.livello_minimo;
+            }
+            return a.nome.localeCompare(b.nome);
           }
-          // Poi alfabeticamente
-          return a.nome.localeCompare(b.nome);
         })
     : [];
     
@@ -218,12 +245,11 @@ const DialogoGestionePreset: React.FC<DialogoGestionePresetProps> = ({
     ? cestiDisponibili
         .filter(cesto => cesto.nome.toLowerCase().includes(filtroIncarichi.toLowerCase()))
         .sort((a, b) => {
-          // Prima per livello
-          if (a.livello !== b.livello) {
-            return a.livello - b.livello;
+          if (ordinamentoAlfabetico) {
+            return a.nome.localeCompare(b.nome);
+          } else {
+            return a.nome.localeCompare(b.nome);
           }
-          // Poi alfabeticamente
-          return a.nome.localeCompare(b.nome);
         })
     : [];
     
@@ -290,7 +316,7 @@ const DialogoGestionePreset: React.FC<DialogoGestionePresetProps> = ({
                 size="small"
                 value={filtroIncarichi}
                 onChange={(e) => setFiltroIncarichi(e.target.value)}
-                sx={{ mb: 1, width: '70%' }}
+                sx={{ mb: 1, width: '60%' }}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -310,20 +336,31 @@ const DialogoGestionePreset: React.FC<DialogoGestionePresetProps> = ({
                   ) : null,
                 }}
               />
-              
-              <Button 
-                onClick={() => handleSelectAll(tabValue === 0 ? 'incarichi' : tabValue === 1 ? 'citta' : 'cesti')}
-                variant="outlined"
-                size="small"
-                disabled={(tabValue === 0 && incarichiFiltrati.length === 0) || 
-                         (tabValue === 1 && incarichiCittaFiltrati.length === 0) || 
-                         (tabValue === 2 && cestiFiltrati.length === 0)}
-              >
-                {(tabValue === 0 && tuttiSelezionatiIncarichi) || 
-                 (tabValue === 1 && tuttiSelezionatiCitta) || 
-                 (tabValue === 2 && tuttiSelezionatiCesti) 
-                  ? 'Deseleziona tutti' : 'Seleziona tutti'}
-              </Button>
+
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button 
+                  onClick={toggleOrdinamento}
+                  variant="outlined"
+                  size="small"
+                  color="info"
+                >
+                  {ordinamentoAlfabetico ? 'Ordina per livello' : 'Ordina alfabetico'}
+                </Button>
+                
+                <Button 
+                  onClick={() => handleSelectAll(tabValue === 0 ? 'incarichi' : tabValue === 1 ? 'citta' : 'cesti')}
+                  variant="outlined"
+                  size="small"
+                  disabled={(tabValue === 0 && incarichiFiltrati.length === 0) || 
+                           (tabValue === 1 && incarichiCittaFiltrati.length === 0) || 
+                           (tabValue === 2 && cestiFiltrati.length === 0)}
+                >
+                  {(tabValue === 0 && tuttiSelezionatiIncarichi) || 
+                   (tabValue === 1 && tuttiSelezionatiCitta) || 
+                   (tabValue === 2 && tuttiSelezionatiCesti) 
+                    ? 'Deseleziona tutti' : 'Seleziona tutti'}
+                </Button>
+              </Box>
             </Box>
             
             {/* Tab per selezionare i diversi tipi di incarichi */}

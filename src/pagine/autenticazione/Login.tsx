@@ -21,7 +21,15 @@ import {
   IconButton,
 } from '@mui/material';
 import { useAuth } from '../../componenti/autenticazione/AuthContext';
-import { doc, getDoc, collection, setDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, setDoc } from 'firebase/firestore'
+import { 
+  getDocWithRateLimit, 
+  getDocsWithRateLimit, 
+  setDocWithRateLimit,
+  updateDocWithRateLimit,
+  deleteDocWithRateLimit,
+  addDocWithRateLimit
+} from '../../configurazione/firebase';;
 import { db } from '../../configurazione/firebase';
 import RefreshIcon from '@mui/icons-material/Refresh';
 
@@ -94,7 +102,7 @@ export default function Login() {
     const caricaRequisiti = async () => {
       try {
         const docRef = doc(db, 'impostazioni', 'requisiti_iscrizione');
-        const docSnap = await getDoc(docRef);
+        const docSnap = await getDocWithRateLimit(docRef);
         
         if (docSnap.exists()) {
           const data = docSnap.data() as Impostazioni;
@@ -201,7 +209,7 @@ export default function Login() {
 
       // Creazione della richiesta nel database
       const richiestaRef = doc(collection(db, 'richieste_registrazione'));
-      await setDoc(richiestaRef, {
+      await setDocWithRateLimit(richiestaRef, {
         nome: formRegistrazione.nome,
         contatto: formRegistrazione.contatto,
         presentazione: formRegistrazione.presentazione,

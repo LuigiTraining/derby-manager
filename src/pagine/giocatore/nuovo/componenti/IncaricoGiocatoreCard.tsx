@@ -292,6 +292,8 @@ export default function IncaricoGiocatoreCard({
         sx={{ 
           mb: 0, // Rimuovo il margin negativo e uso 0 per evitare spazi
           mt: 0, // Rimuovo il margin negativo e uso 0 per evitare spazi
+          mx: 0, // Aggiungo margine laterale 0
+          width: '100%', // Aggiungo larghezza 100%
           backgroundColor: getCardColor(),
           transition: "background-color 0.3s ease",
           borderTop: evidenziato ? "2px solid gold" : "1px solid rgba(0, 0, 0, 0.12)",
@@ -456,7 +458,7 @@ export default function IncaricoGiocatoreCard({
                     size="small" 
                     label={`${cestoInfo.cesto.nome} (${Math.min(valoreMostrato, cestoInfo.quantitaInCesto)}/${cestoInfo.quantitaInCesto})`}
                     color="warning"
-                    variant="outlined"
+                    variant="filled"
                     onClick={(e) => {
                       e.stopPropagation();
                       if (onNavigateToCesto) {
@@ -464,8 +466,12 @@ export default function IncaricoGiocatoreCard({
                       }
                     }}
                     sx={{
-                      borderColor: 'rgba(237, 108, 2, 0.5)',
+                      backgroundColor: '#a37838',
+                      color: 'white',
                       fontSize: '0.75rem',
+                      '&:hover': {
+                        backgroundColor: '#804c00',
+                      },
                     }}
                   />
                 </Box>

@@ -34,8 +34,16 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import EditIcon from '@mui/icons-material/Edit';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import Layout from '../../componenti/layout/Layout';
-import { collection, doc, getDoc, setDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy } from 'firebase/firestore';
+import Layout, { getConteggiRichieste } from '../../componenti/layout/Layout';
+import { collection, doc, getDoc, setDoc, getDocs, updateDoc, deleteDoc, query, where, orderBy } from 'firebase/firestore'
+import { 
+  getDocWithRateLimit, 
+  getDocsWithRateLimit, 
+  setDocWithRateLimit,
+  updateDocWithRateLimit,
+  deleteDocWithRateLimit,
+  addDocWithRateLimit
+} from '../../configurazione/firebase';;
 import { db } from '../../configurazione/firebase';
 
 interface Requisito {
@@ -102,7 +110,7 @@ export default function Impostazioni() {
   const caricaRequisiti = async () => {
     try {
       const docRef = doc(db, 'impostazioni', 'requisiti_iscrizione');
-      const docSnap = await getDoc(docRef);
+      const docSnap = await getDocWithRateLimit(docRef);
       
       if (docSnap.exists()) {
         const data = docSnap.data() as Impostazioni;
@@ -110,7 +118,7 @@ export default function Impostazioni() {
         setDescrizioneRegistrazione(data.descrizione_registrazione || '');
         setDescrizionePresentation(data.descrizione_presentazione || '');
       } else {
-        await setDoc(docRef, { 
+        await setDocWithRateLimit(docRef, { 
           requisiti: [], 
           descrizione_registrazione: '',
           descrizione_presentazione: ''
@@ -132,7 +140,7 @@ export default function Impostazioni() {
         collection(db, 'richieste_registrazione'),
         orderBy('data_richiesta', 'desc')
       );
-      const querySnapshot = await getDocs(q);
+      const querySnapshot = await getDocsWithRateLimit(q);
       const richiesteData = querySnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -173,7 +181,7 @@ export default function Impostazioni() {
   const salvaRequisiti = async (nuoviRequisiti: Requisito[]) => {
     try {
       const docRef = doc(db, 'impostazioni', 'requisiti_iscrizione');
-      await setDoc(docRef, { 
+      await setDocWithRateLimit(docRef, { 
         requisiti: nuoviRequisiti,
         descrizione_registrazione: descrizioneRegistrazione,
         descrizione_presentazione: descrizionePresentation
@@ -189,7 +197,7 @@ export default function Impostazioni() {
   const salvaDescrizione = async () => {
     try {
       const docRef = doc(db, 'impostazioni', 'requisiti_iscrizione');
-      await setDoc(docRef, { 
+      await setDocWithRateLimit(docRef, { 
         requisiti,
         descrizione_registrazione: nuovaDescrizione 
       });
@@ -206,7 +214,7 @@ export default function Impostazioni() {
   const salvaDescrizionePresentation = async () => {
     try {
       const docRef = doc(db, 'impostazioni', 'requisiti_iscrizione');
-      await setDoc(docRef, { 
+      await setDocWithRateLimit(docRef, { 
         requisiti,
         descrizione_registrazione: descrizioneRegistrazione,
         descrizione_presentazione: nuovaDescrizionePresentation
@@ -249,7 +257,7 @@ export default function Impostazioni() {
 
       // Aggiorna lo stato della richiesta
       const richiestaRef = doc(db, 'richieste_registrazione', richiesta.id);
-      await updateDoc(richiestaRef, {
+      await updateDocWithRateLimit(richiestaRef, {
         stato: nuovoStato,
         data_risposta: new Date().toISOString()
       });
@@ -263,6 +271,7 @@ export default function Impostazioni() {
           ruolo: 'giocatore',
           contatto: richiesta.contatto,
           contattoVisibile: false,
+          note: richiesta.presentazione,
           farms: [{
             nome: richiesta.farm.nome,
             tag: '',
@@ -280,13 +289,28 @@ export default function Impostazioni() {
         };
 
         // Crea il nuovo documento del giocatore usando il PIN come ID
-        await setDoc(doc(db, 'utenti', nuovoPin.toString()), nuovoGiocatore);
+        await setDocWithRateLimit(doc(db, 'utenti', nuovoPin.toString()), nuovoGiocatore);
 
         // Mostra il PIN
         setUltimoPinGenerato(nuovoPin);
         setOpenPinDialog(true);
       }
 
+      // Aggiorna localmente le richieste senza dover rifare la chiamata al database
+      const richiesteAggiornate = richieste.map(r => 
+        r.id === richiesta.id 
+          ? { ...r, stato: nuovoStato, data_risposta: new Date().toISOString() } 
+          : r
+      );
+      setRichieste(richiesteAggiornate);
+      
+      // Aggiorna il contatore delle richieste in attesa
+      const richiesteInAttesa = richiesteAggiornate.filter(r => r.stato === 'in_attesa').length;
+      setNuoveRichieste(richiesteInAttesa);
+
+      // Aggiorna il contatore globale delle richieste
+      const conteggio = await getConteggiRichieste();
+      
       setSuccess(`Richiesta ${nuovoStato === 'approvata' ? 'approvata' : 'rifiutata'} con successo!`);
     } catch (error) {
       console.error('Errore nella gestione della richiesta:', error);

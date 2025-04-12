@@ -60,6 +60,11 @@ interface IncaricoCardProps {
   isInPreset?: boolean;
 }
 
+// Definisci le costanti per gli eventi, uguali a quelle in TestGestioneAssegnazioni
+const ESPANDI_TUTTI_INCARICHI_EVENT = 'espandi-tutti-incarichi';
+const COMPRIMI_TUTTI_INCARICHI_EVENT = 'comprimi-tutti-incarichi';
+const INCARICO_EXPANDED_STATE_CHANGED = 'incarico-expanded-state-changed';
+
 /**
  * Componente per visualizzare un incarico (standard o città)
  */
@@ -101,31 +106,53 @@ export const IncaricoCard: React.FC<IncaricoCardProps> = ({
     }
   });
 
-  // Salva lo stato di espansione nel localStorage
+  // Aggiungi event listener per gli eventi di espansione/compressione globale
   useEffect(() => {
-    try {
-      // Recupera lo stato attuale dal localStorage
-      const expandedIncarichi = localStorage.getItem("expandedIncarichi");
-      let expandedIds = expandedIncarichi ? JSON.parse(expandedIncarichi) : [];
+    // Handler per espandere tutti gli incarichi
+    const handleEspandiTuttiIncarichi = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { incarichiIds } = customEvent.detail || { incarichiIds: [] };
       
-      // Aggiorna l'array in base allo stato corrente
-      if (farmExpanded && !expandedIds.includes(incarico.id)) {
-        expandedIds.push(incarico.id);
-      } else if (!farmExpanded && expandedIds.includes(incarico.id)) {
-        expandedIds = expandedIds.filter((id: string) => id !== incarico.id);
+      if (incarichiIds.includes(incarico.id)) {
+        setFarmExpanded(true);
       }
-      
-      // Salva l'array aggiornato
-      localStorage.setItem("expandedIncarichi", JSON.stringify(expandedIds));
-    } catch (error) {
-      console.error("Errore nel salvataggio degli incarichi espansi:", error);
-    }
-  }, [farmExpanded, incarico.id]);
-
-  // Filtra le assegnazioni per questo incarico
-  const incaricoAssegnazioni = assegnazioni.filter(
-    (a) => a.tipo === "incarico" && a.riferimento_id === incarico.id
-  );
+    };
+    
+    // Handler per comprimere tutti gli incarichi
+    const handleComprimiTuttiIncarichi = () => {
+      setFarmExpanded(false);
+    };
+    
+    // Aggiungi event listener
+    window.addEventListener(ESPANDI_TUTTI_INCARICHI_EVENT, handleEspandiTuttiIncarichi);
+    window.addEventListener(COMPRIMI_TUTTI_INCARICHI_EVENT, handleComprimiTuttiIncarichi);
+    
+    // Rimuovi event listener quando il componente viene distrutto
+    return () => {
+      window.removeEventListener(ESPANDI_TUTTI_INCARICHI_EVENT, handleEspandiTuttiIncarichi);
+      window.removeEventListener(COMPRIMI_TUTTI_INCARICHI_EVENT, handleComprimiTuttiIncarichi);
+    };
+  }, [incarico.id]);
+  
+  // Listener per i cambiamenti nel localStorage
+  useEffect(() => {
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === "expandedIncarichi") {
+        try {
+          const expandedIds = event.newValue ? JSON.parse(event.newValue) : [];
+          setFarmExpanded(expandedIds.includes(incarico.id));
+        } catch (error) {
+          console.error("Errore nel parsing degli incarichi espansi:", error);
+        }
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [incarico.id]);
 
   // Funzione per aprire il menu contestuale
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -168,16 +195,54 @@ export const IncaricoCard: React.FC<IncaricoCardProps> = ({
   // Calcola la quantità dell'incarico
   const quantita = getQuantitaIncarico(incarico);
 
+  // Salva lo stato di espansione nel localStorage
+  useEffect(() => {
+    try {
+      // Recupera lo stato attuale dal localStorage
+      const expandedIncarichi = localStorage.getItem("expandedIncarichi");
+      let expandedIds = expandedIncarichi ? JSON.parse(expandedIncarichi) : [];
+      
+      // Aggiorna l'array in base allo stato corrente
+      if (farmExpanded && !expandedIds.includes(incarico.id)) {
+        expandedIds.push(incarico.id);
+      } else if (!farmExpanded && expandedIds.includes(incarico.id)) {
+        expandedIds = expandedIds.filter((id: string) => id !== incarico.id);
+      }
+      
+      // Salva l'array aggiornato
+      localStorage.setItem("expandedIncarichi", JSON.stringify(expandedIds));
+      
+      // Notifica il cambio di stato attraverso un evento personalizzato
+      // Importante: questo evento viene emesso DOPO l'aggiornamento del localStorage
+      const stateChangeEvent = new CustomEvent(INCARICO_EXPANDED_STATE_CHANGED, {
+        detail: { expanded: farmExpanded, incaricoId: incarico.id, totalExpanded: expandedIds.length }
+      });
+      window.dispatchEvent(stateChangeEvent);
+    } catch (error) {
+      console.error("Errore nel salvataggio degli incarichi espansi:", error);
+    }
+  }, [farmExpanded, incarico.id]);
+
+  // Filtra le assegnazioni per questo incarico
+  const incaricoAssegnazioni = assegnazioni.filter(
+    (a) => a.tipo === "incarico" && a.riferimento_id === incarico.id
+  );
+
   return (
     <Card 
       sx={{ 
-        mb: 1, 
-        borderRadius: 1, 
-        overflow: 'visible',
-        border: evidenziato ? `2px solid ${theme.palette.warning.main}` : (isInPreset ? `2px solid ${theme.palette.primary.main}` : 'none'),
-        boxShadow: evidenziato ? '0 0 8px rgba(255, 152, 0, 0.6)' : (isInPreset ? '0 0 4px rgba(25, 118, 210, 0.4)' : theme.shadows[1]),
+        mb: 0,
+        borderRadius: 0,
+        overflow: 'hidden',
+        border: evidenziato ? 'none' : (isInPreset ? `2px solid ${theme.palette.primary.main}` : 'none'),
+        boxShadow: evidenziato ? theme.shadows[1] : (isInPreset ? '0 0 4px rgba(25, 118, 210, 0.4)' : 'none'),
         position: 'relative',
+        bgcolor: evidenziato ? 'rgba(255, 235, 59, 0.2)' : (farmExpanded ? 'rgba(0, 0, 0, 0.05)' : 'inherit'),
+        transition: 'background-color 0.3s ease',
+        pb: farmExpanded ? 0 : undefined,
+        borderBottom: '1px solid rgba(0, 0, 0, 0.12)'
       }}
+      id={isCittaIncarico ? `incaricoCitta-${incarico.id}` : `incarico-${incarico.id}`}
     >
       {isInPreset && (
         <Box
@@ -405,8 +470,12 @@ export const IncaricoCard: React.FC<IncaricoCardProps> = ({
 
       {/* Lista delle farm assegnate (espandibile) - ora separata dalla riga principale */}
       <Collapse in={farmExpanded} timeout="auto" unmountOnExit>
-        <Divider sx={{ my: 1 }} />
-        <Box sx={{ p: 1, pl: 3 }}>
+        <Divider />
+        <Box sx={{ 
+          p: 1, 
+          pl: 3,
+          bgcolor: 'background.paper'
+        }}>
           {incaricoAssegnazioni.length === 0 ? (
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
               Nessuna farm assegnata
@@ -447,14 +516,15 @@ export const IncaricoCard: React.FC<IncaricoCardProps> = ({
                   const giocatoreNome = assegnazioniGiocatore[0].giocatore_nome || `Giocatore ${giocatoreId}`;
                   
                   return (
-                    <Box key={giocatoreId} sx={{ mb: 2 }}>
+                    <Box key={giocatoreId} sx={{ mb: 0.5 }}>
                       {/* Nome del giocatore */}
                       <Typography 
                         variant="body2" 
                         sx={{ 
                           fontWeight: 'bold', 
-                          mb: 0.5,
-                          pb: 0.5,
+                          mb: 0,
+                          pb: 0.25,
+                          fontSize: '0.75rem',
                           borderBottom: '1px dashed rgba(0, 0, 0, 0.1)'
                         }}
                       >
@@ -469,12 +539,13 @@ export const IncaricoCard: React.FC<IncaricoCardProps> = ({
                             sx={{
                               bgcolor: "background.paper",
                               borderRadius: 1,
-                              mb: 0.5,
-                              py: 0.5,
+                              mb: 0.25,
+                              py: 0.25,
                               pl: 1, // Ridotto il padding a sinistra
-                              pr: 8, // Aggiungo padding a destra per dare spazio alle azioni
-                              height: '36px', // Altezza fissa per garantire allineamento
-                              position: 'relative' // Necessario per posizionamento assoluto dei figli
+                              pr: 6, // Ridotto il padding a destra
+                              height: '26px', // Ridotta l'altezza
+                              position: 'relative', // Necessario per posizionamento assoluto dei figli
+                              minHeight: 'unset' // Override del minHeight predefinito di ListItem
                             }}
                             secondaryAction={null} // Rimuovo l'azione secondaria standard
                           >
@@ -486,15 +557,15 @@ export const IncaricoCard: React.FC<IncaricoCardProps> = ({
                                   display: 'flex', 
                                   alignItems: 'center',
                                   height: '100%', // Occupa tutta l'altezza disponibile
-                                  fontSize: '0.875rem', // Mantengo la dimensione del carattere di body2
-                                  lineHeight: 1.43 // Mantengo il line-height di body2
+                                  fontSize: '0.75rem', // Ridotta la dimensione del carattere
+                                  lineHeight: 1.2 // Ridotto line-height
                                 }}>
                                   <Avatar 
                                     sx={{ 
-                                      width: 24, 
-                                      height: 24, 
-                                      fontSize: '0.75rem',
-                                      mr: 1,
+                                      width: 18, 
+                                      height: 18, 
+                                      fontSize: '0.65rem',
+                                      mr: 0.5,
                                       bgcolor: assegnazione.stato === "inattivo" ? 'rgba(158, 158, 158, 0.1)' : 'rgb(33, 150, 243, 0.1)',
                                       color: assegnazione.stato === "inattivo" ? 'rgb(158, 158, 158)' : 'rgb(33, 150, 243)',
                                       fontWeight: 'normal',
@@ -508,7 +579,8 @@ export const IncaricoCard: React.FC<IncaricoCardProps> = ({
                                     component="span" 
                                     sx={{ 
                                       color: assegnazione.stato === "inattivo" ? 'text.disabled' : 'inherit',
-                                      textDecoration: assegnazione.stato === "inattivo" ? 'none' : 'inherit'
+                                      textDecoration: assegnazione.stato === "inattivo" ? 'none' : 'inherit',
+                                      fontSize: '0.75rem' // Ridotta la dimensione del carattere
                                     }}
                                   >
                                     {assegnazione.farm_nome || `Farm ${assegnazione.farm_id.split('_')[1] || ''}`}
@@ -521,10 +593,10 @@ export const IncaricoCard: React.FC<IncaricoCardProps> = ({
                             <Box 
                               sx={{ 
                                 display: "flex", 
-                                gap: 0.5, 
+                                gap: 0.25, 
                                 alignItems: 'center', 
                                 position: 'absolute', 
-                                right: 8,
+                                right: 4,
                                 top: '50%',
                                 transform: 'translateY(-50%)' // Centra verticalmente
                               }}
@@ -535,11 +607,11 @@ export const IncaricoCard: React.FC<IncaricoCardProps> = ({
                                   <Box 
                                     component="span"
                                     sx={{ 
-                                      fontSize: '0.75rem',
+                                      fontSize: '0.7rem',
                                       fontWeight: 'bold',
                                       color: assegnazione.completato ? 'success.main' : 'primary.main',
                                       display: 'inline-block',
-                                      width: '40px',
+                                      width: '30px',
                                       textAlign: 'right'
                                     }}
                                   >
@@ -554,11 +626,17 @@ export const IncaricoCard: React.FC<IncaricoCardProps> = ({
                                     size="small"
                                     onClick={() => handleRimuoviAssegnazione(assegnazione.id)}
                                     sx={{ 
-                                      ml: 1,
-                                      p: 0.5 // Padding ridotto per allineamento migliore
+                                      ml: 0.25,
+                                      p: 0.25,
+                                      width: 18,
+                                      height: 18
                                     }}
                                   >
-                                    <CancelIcon fontSize="small" color="error" />
+                                    <CancelIcon 
+                                      fontSize="small" 
+                                      color="error" 
+                                      sx={{ fontSize: '0.95rem' }}
+                                    />
                                   </IconButton>
                                 </Tooltip>
                               )}

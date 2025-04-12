@@ -70,7 +70,15 @@ import {
   Timestamp,
   updateDoc,
   addDoc,
-} from "firebase/firestore";
+} from "firebase/firestore"
+import { 
+  getDocWithRateLimit, 
+  getDocsWithRateLimit, 
+  setDocWithRateLimit,
+  updateDocWithRateLimit,
+  deleteDocWithRateLimit,
+  addDocWithRateLimit
+} from '../../configurazione/firebase';;
 import { db } from "../../configurazione/firebase";
 import { Incarico, IncaricoCitta } from "../../tipi/incarico";
 import { ElementoCitta } from "../../tipi/citta";
@@ -297,7 +305,7 @@ export default function GestioneIncarichi() {
   // Carica gli incarichi dal database
   const caricaIncarichi = async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, "incarichi"));
+      const querySnapshot = await getDocsWithRateLimit(collection(db, "incarichi"));
       const incarichiData = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
@@ -312,7 +320,7 @@ export default function GestioneIncarichi() {
   // Carica gli edifici dal database con il loro livello
   const caricaEdifici = async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, "edifici"));
+      const querySnapshot = await getDocsWithRateLimit(collection(db, "edifici"));
       const edificiData = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
@@ -330,7 +338,7 @@ export default function GestioneIncarichi() {
   const caricaElementiCitta = async () => {
     try {
       const elementiQuery = query(collection(db, "elementi_citta"));
-      const snapshot = await getDocs(elementiQuery);
+      const snapshot = await getDocsWithRateLimit(elementiQuery);
       const elementiData = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
@@ -345,7 +353,7 @@ export default function GestioneIncarichi() {
   // Carica gli incarichi città dal database
   const caricaIncarichiCitta = async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, "incarichi_citta"));
+      const querySnapshot = await getDocsWithRateLimit(collection(db, "incarichi_citta"));
       const incarichiData = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
@@ -360,7 +368,7 @@ export default function GestioneIncarichi() {
   // Carica i derby dal database
   const caricaDerby = async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, "derby"));
+      const querySnapshot = await getDocsWithRateLimit(collection(db, "derby"));
       const derbyData = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
@@ -569,7 +577,7 @@ export default function GestioneIncarichi() {
       };
 
       // Salva l'incarico nel database
-      await setDoc(doc(db, "incarichi", incaricoData.id), incaricoData);
+      await setDocWithRateLimit(doc(db, "incarichi", incaricoData.id), incaricoData);
 
       setSuccess(
         editingIncarico
@@ -681,13 +689,13 @@ export default function GestioneIncarichi() {
       }
 
       if (formDataCitta.id) {
-        await updateDoc(
+        await updateDocWithRateLimit(
           doc(db, "incarichi_citta", formDataCitta.id),
           incaricoData as any
         );
         setSuccess("Incarico città aggiornato con successo!");
       } else {
-        await setDoc(doc(db, "incarichi_citta", incaricoData.id), incaricoData);
+        await setDocWithRateLimit(doc(db, "incarichi_citta", incaricoData.id), incaricoData);
         setSuccess("Incarico città creato con successo!");
       }
 
@@ -708,7 +716,7 @@ export default function GestioneIncarichi() {
     }
 
     try {
-      await deleteDoc(doc(db, "incarichi_citta", incarico.id));
+      await deleteDocWithRateLimit(doc(db, "incarichi_citta", incarico.id));
       setSuccess("Incarico città eliminato con successo!");
       caricaIncarichiCitta();
     } catch (error) {
@@ -2495,7 +2503,7 @@ export default function GestioneIncarichi() {
                   (i) => i.id === anchorEl.id
                 );
                 if (incaricoStandard) {
-                  deleteDoc(doc(db, "incarichi", anchorEl.id));
+                  deleteDocWithRateLimit(doc(db, "incarichi", anchorEl.id));
                   caricaIncarichi();
                   setAnchorEl(null);
                   return;

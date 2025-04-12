@@ -27,7 +27,15 @@ import {
 import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, MoreVert as MoreVertIcon } from '@mui/icons-material';
 import LocationCityIcon from '@mui/icons-material/LocationCity';
 import PersonIcon from '@mui/icons-material/Person';
-import { collection, query, getDocs, doc, setDoc, deleteDoc, Timestamp } from 'firebase/firestore';
+import { collection, query, getDocs, doc, setDoc, deleteDoc, Timestamp } from 'firebase/firestore'
+import { 
+  getDocWithRateLimit, 
+  getDocsWithRateLimit, 
+  setDocWithRateLimit,
+  updateDocWithRateLimit,
+  deleteDocWithRateLimit,
+  addDocWithRateLimit
+} from '../../configurazione/firebase';;
 import { db } from '../../configurazione/firebase';
 import { ElementoCitta, TipoElementoCitta } from '../../tipi/citta';
 import Layout from '../../componenti/layout/Layout';
@@ -63,7 +71,7 @@ export default function GestioneCitta() {
   const caricaElementi = async () => {
     try {
       const elementiQuery = query(collection(db, 'elementi_citta'));
-      const snapshot = await getDocs(elementiQuery);
+      const snapshot = await getDocsWithRateLimit(elementiQuery);
       const elementiData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -129,7 +137,7 @@ export default function GestioneCitta() {
         data_creazione: editingElemento?.data_creazione || Timestamp.now(),
       };
 
-      await setDoc(doc(db, 'elementi_citta', elementoData.id), elementoData);
+      await setDocWithRateLimit(doc(db, 'elementi_citta', elementoData.id), elementoData);
 
       setSuccess(editingElemento ? 'Elemento aggiornato con successo!' : 'Elemento creato con successo!');
       handleCloseDialog();
@@ -146,7 +154,7 @@ export default function GestioneCitta() {
     }
 
     try {
-      await deleteDoc(doc(db, 'elementi_citta', elemento.id));
+      await deleteDocWithRateLimit(doc(db, 'elementi_citta', elemento.id));
       setSuccess('Elemento eliminato con successo!');
       caricaElementi();
     } catch (error) {

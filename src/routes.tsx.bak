@@ -18,8 +18,6 @@ import Blocchi from './pagine/admin/Blocchi';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import PaginaInCostruzione from './componenti/wiki/PaginaInCostruzione';
 import MieiIncarichiNuovo from "./pagine/giocatore/nuovo/MieiIncarichiNuovo";
-import GestioneRegolamenti from './pagine/regolamento/GestioneRegolamenti';
-import { RegolamentiProvider } from './componenti/regolamento/RegolamentiContext';
 
 // Modifichiamo il componente ProtectedRoute per supportare i moderatori
 const ProtectedRoute: React.FC<{ 
@@ -42,19 +40,19 @@ const ProtectedRoute: React.FC<{
   }
 
   if (requireAdmin && currentUser.ruolo !== 'admin') {
-    return <Navigate to="/welcome" replace />;
+    return <Navigate to="/miei-incarichi" replace />;
   }
 
   if (requireCoordinatore && !['admin', 'coordinatore'].includes(currentUser.ruolo)) {
-    return <Navigate to="/welcome" replace />;
+    return <Navigate to="/miei-incarichi" replace />;
   }
 
   if (requireModOrHigher && !['admin', 'coordinatore', 'moderatore'].includes(currentUser.ruolo)) {
-    return <Navigate to="/welcome" replace />;
+    return <Navigate to="/miei-incarichi" replace />;
   }
 
   if (requireGiocatore && currentUser.ruolo !== 'giocatore') {
-    return <Navigate to="/welcome" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;
@@ -109,41 +107,17 @@ export default function AppRoutes() {
         } 
       />
 
-      {/* Regolamento pages - Note: L'ordine è importante! */}
+      {/* Regolamento pages */}
       <Route 
-        path="/regolamento/edit/:sectionId" 
+        path="/regolamento/*" 
         element={
           <ProtectedRoute>
-            <RegolamentiProvider>
-              <GestioneRegolamenti />
-            </RegolamentiProvider>
-          </ProtectedRoute>
-        } 
-      />
-      
-      <Route 
-        path="/regolamento/:sectionId" 
-        element={
-          <ProtectedRoute>
-            <RegolamentiProvider>
-              <GestioneRegolamenti />
-            </RegolamentiProvider>
-          </ProtectedRoute>
-        } 
-      />
-      
-      <Route 
-        path="/regolamento" 
-        element={
-          <ProtectedRoute>
-            <RegolamentiProvider>
-              <GestioneRegolamenti />
-            </RegolamentiProvider>
+            <PaginaInCostruzione />
           </ProtectedRoute>
         } 
       />
 
-      {/* Dashboard principale (admin, Co-Leader e Gestore) */}
+      {/* Dashboard principale (admin, Co-Leader e Admin) */}
       <Route 
         path="/dashboard" 
         element={
@@ -163,7 +137,7 @@ export default function AppRoutes() {
         } 
       />
 
-      {/* Gestione Edifici (admin, Co-Leader e Gestore) */}
+      {/* Gestione Edifici (admin, Co-Leader e Admin) */}
       <Route 
         path="/edifici" 
         element={
@@ -173,7 +147,7 @@ export default function AppRoutes() {
         } 
       />
 
-      {/* Gestione Incarichi (admin, Co-Leader e Gestore) */}
+      {/* Gestione Incarichi (admin, Co-Leader e Admin) */}
       <Route 
         path="/incarichi" 
         element={
@@ -183,7 +157,7 @@ export default function AppRoutes() {
         } 
       />
 
-      {/* Gestione Cesti (admin, Co-Leader e Gestore) */}
+      {/* Gestione Cesti (admin, Co-Leader e Admin) */}
       <Route 
         path="/cesti" 
         element={
@@ -193,27 +167,7 @@ export default function AppRoutes() {
         } 
       />
 
-      {/* Test Gestione Assegnazioni (admin, Co-Leader e Gestore) */}
-      <Route 
-        path="/test-assegnazioni" 
-        element={
-          <ProtectedRoute requireModOrHigher>
-            <TestGestioneAssegnazioni />
-          </ProtectedRoute>
-        } 
-      />
-
-      {/* Route per Giocatori */}
-      <Route 
-        path="/giocatore/nuovo/miei-incarichi" 
-        element={
-          <ProtectedRoute>
-            <MieiIncarichiNuovo />
-          </ProtectedRoute>
-        } 
-      />
-
-      {/* Gestione Città (admin, Co-Leader e Gestore) */}
+      {/* Gestione Città (admin, Co-Leader e Admin) */}
       <Route 
         path="/citta" 
         element={
@@ -223,18 +177,45 @@ export default function AppRoutes() {
         } 
       />
 
-      {/* Rotte Admin */}
-      <Route 
-        path="/admin/impostazioni" 
+      {/* Gestione Assegnazioni (admin, Co-Leader e Admin) */}
+      <Route
+        path="/admin/assegnazioni"
         element={
-          <ProtectedRoute requireAdmin>
+          <Navigate to="/admin/test-assegnazioni" replace />
+        }
+      />
+
+      {/* Test Nuova Gestione Assegnazioni (admin, Co-Leader e Admin) */}
+      <Route
+        path="/admin/test-assegnazioni"
+        element={
+          <ProtectedRoute requireModOrHigher>
+            <TestGestioneAssegnazioni />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Lista incarichi personali (tutti tranne admin) */}
+      <Route
+        path="/miei-incarichi"
+        element={
+          <Navigate to="/giocatore/nuovo/miei-incarichi" replace />
+        }
+      />
+
+      {/* Impostazioni (solo admin e Co-Leader) */}
+      <Route 
+        path="/impostazioni" 
+        element={
+          <ProtectedRoute requireCoordinatore>
             <Impostazioni />
           </ProtectedRoute>
         } 
       />
 
+      {/* Inizializzazione (solo admin) */}
       <Route 
-        path="/admin/inizializzazione" 
+        path="/inizializzazione" 
         element={
           <ProtectedRoute requireAdmin>
             <Inizializzazione />
@@ -242,35 +223,48 @@ export default function AppRoutes() {
         } 
       />
 
+      {/* Gestione Derby (admin e Co-Leader) */}
       <Route 
         path="/admin/derby" 
         element={
-          <ProtectedRoute requireAdmin>
+          <ProtectedRoute requireCoordinatore>
             <GestioneDerby />
           </ProtectedRoute>
         } 
       />
 
+      {/* Statistiche (admin e coordinatori) */}
       <Route 
         path="/admin/statistiche" 
         element={
-          <ProtectedRoute requireAdmin>
+          <ProtectedRoute requireCoordinatore>
             <Statistiche />
           </ProtectedRoute>
         } 
       />
 
+      {/* Blocchi (visibile a tutti, gestibile solo da admin e coordinatori) */}
       <Route 
         path="/admin/blocchi" 
         element={
-          <ProtectedRoute requireAdmin>
+          <ProtectedRoute>
             <Blocchi />
           </ProtectedRoute>
         } 
       />
 
-      {/* Route 404 */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      {/* Nuovi Miei Incarichi */}
+      <Route
+        path="/giocatore/nuovo/miei-incarichi"
+        element={
+          <ProtectedRoute>
+            <MieiIncarichiNuovo />
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Route di fallback */}
+      <Route path="*" element={<Navigate to="/welcome" replace />} />
     </Routes>
   );
 }

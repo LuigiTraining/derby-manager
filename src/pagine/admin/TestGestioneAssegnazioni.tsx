@@ -17,6 +17,8 @@ import { aggiornaUltimoUtilizzo } from "../../servizi/presetsService";
 import DialogoTrasferimentoAssegnazioni from './temp/componenti/DialogoTrasferimentoAssegnazioni';
 import { GestioneAssegnazioniDropdown } from './temp/componenti/GestioneAssegnazioniDropdown';
 import PresetsAssegnazioniDropdown from './temp/componenti/PresetsAssegnazioniDropdown';
+import DialogoGestioneListaPreset from "./temp/componenti/DialogoGestioneListaPreset";
+import TooltipWrapper from "../../componenti/comune/TooltipWrapper";
 
 // Importo le funzioni di gestione cache
 import { 
@@ -36,8 +38,17 @@ import {
   QueryDocumentSnapshot,
   DocumentData,
   onSnapshot,
-} from "firebase/firestore";
-import { db } from "../../configurazione/firebase";
+  runTransaction
+} from "firebase/firestore"
+import { 
+  getDocWithRateLimit, 
+  getDocsWithRateLimit, 
+  setDocWithRateLimit,
+  updateDocWithRateLimit,
+  deleteDocWithRateLimit,
+  addDocWithRateLimit,
+  db
+} from '../../configurazione/firebase';
 import { 
   aggiornaTimestampCollezione, 
   caricaDatiConCache, 
@@ -76,6 +87,13 @@ import NotificationsActiveIcon from "@mui/icons-material/NotificationsActive";
 import NotificationsOffIcon from "@mui/icons-material/NotificationsOff";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 import { useTranslation } from "react-i18next";
+import { useAuth } from '../../componenti/autenticazione/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import * as presetsService from "../../servizi/presetsService";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
+import UnfoldLessIcon from "@mui/icons-material/UnfoldLess";
 
 // Interfaccia per le tab
 interface TabPanelProps {
@@ -100,6 +118,11 @@ function TabPanel(props: TabPanelProps) {
     </div>
   );
 }
+
+// Definisci un evento personalizzato per notificare i componenti IncaricoCard
+const ESPANDI_TUTTI_INCARICHI_EVENT = 'espandi-tutti-incarichi';
+const COMPRIMI_TUTTI_INCARICHI_EVENT = 'comprimi-tutti-incarichi';
+const INCARICO_EXPANDED_STATE_CHANGED = 'incarico-expanded-state-changed';
 
 /**
  * Pagina di test per il nuovo componente GestioneAssegnazioni
@@ -229,6 +252,21 @@ export default function TestGestioneAssegnazioni() {
   const [presetAttivo, setPresetAttivo] = useState<PresetAssegnazioni | null>(null);
   const [incarichiFiltratiPreset, setIncarichiFiltratiPreset] = useState<string[]>([]);
 
+  // Stato per tenere traccia di tutti gli incarichi espansi globalmente
+  const [tuttiIncarichiEspansi, setTuttiIncarichiEspansi] = useState<boolean>(() => {
+    try {
+      // Controlla se ci sono incarichi espansi nel localStorage
+      const expandedIncarichi = localStorage.getItem("expandedIncarichi");
+      if (expandedIncarichi) {
+        const expandedIds = JSON.parse(expandedIncarichi);
+        return expandedIds.length > 0;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  });
+
   const { t } = useTranslation();
 
   // Effetti per salvare gli stati nel localStorage
@@ -332,6 +370,8 @@ export default function TestGestioneAssegnazioni() {
   // Carica i dati all'avvio
   useEffect(() => {
     caricaDati();
+    // Forza l'aggiornamento dei preset all'avvio
+    forzaAggiornamentoPresets();
   }, []);
 
   // Al caricamento dell'applicazione, verifichiamo se c'è un derby selezionato nel localStorage
@@ -761,7 +801,7 @@ export default function TestGestioneAssegnazioni() {
       const farmIndexNum = parseInt(farmIndex, 10);
       
       // Cerca l'utente direttamente
-      const utenteDoc = await getDoc(doc(db, "utenti", giocatoreId));
+      const utenteDoc = await getDocWithRateLimit(doc(db, "utenti", giocatoreId));
       
       if (utenteDoc.exists()) {
         const utenteData = utenteDoc.data();
@@ -800,7 +840,7 @@ export default function TestGestioneAssegnazioni() {
         
         // Come fallback, prova a cercare in tutti gli utenti
         const utentiRef = collection(db, "utenti");
-        const utentiSnapshot = await getDocs(utentiRef);
+        const utentiSnapshot = await getDocsWithRateLimit(utentiRef);
         
         // Cerca una farm con ID corrispondente in tutti gli utenti
         for (const doc of utentiSnapshot.docs) {
@@ -901,7 +941,7 @@ export default function TestGestioneAssegnazioni() {
       
       const assegnazioniRef = collection(db, "assegnazioni");
       const q = query(assegnazioniRef);
-      const querySnapshot = await getDocs(q);
+      const querySnapshot = await getDocsWithRateLimit(q);
       
       const assegnazioniData: Assegnazione[] = [];
       querySnapshot.forEach((doc) => {
@@ -947,7 +987,7 @@ export default function TestGestioneAssegnazioni() {
     try {
       // Elimina tutte le assegnazioni da Firebase
       const assegnazioniRef = collection(db, "assegnazioni");
-      const assegnazioniSnapshot = await getDocs(assegnazioniRef);
+      const assegnazioniSnapshot = await getDocsWithRateLimit(assegnazioniRef);
       
       // Crea un batch per eliminare tutte le assegnazioni
       const batch = writeBatch(db);
@@ -1045,7 +1085,7 @@ export default function TestGestioneAssegnazioni() {
       
       // Carica i progressi degli incarichi da Firebase
       const progressiRef = collection(db, "progressi");
-      const progressiSnapshot = await getDocs(progressiRef);
+      const progressiSnapshot = await getDocsWithRateLimit(progressiRef);
       
       
       
@@ -1639,7 +1679,7 @@ export default function TestGestioneAssegnazioni() {
 
     // Scorri alla posizione dell'incarico città
     setTimeout(() => {
-      const element = document.getElementById(`incarico-${incaricoId}`);
+      const element = document.getElementById(`incaricoCitta-${incaricoId}`);
       if (element) {
         element.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
@@ -1797,7 +1837,7 @@ export default function TestGestioneAssegnazioni() {
     try {
       // Carico gli utenti dalla collezione "utenti" invece che "giocatori"
       const utentiRef = collection(db, "utenti");
-      const utentiSnapshot = await getDocs(utentiRef);
+      const utentiSnapshot = await getDocsWithRateLimit(utentiRef);
       
       const giocatoriData: {
         giocatore_id: string;
@@ -1805,16 +1845,22 @@ export default function TestGestioneAssegnazioni() {
         farms: Farm[];
       }[] = [];
       
-      // Per l'assegnazione di preset, prepariamo una mappa degli incarichi già assegnati ad ogni farm
+      // Per l'assegnazione di preset, prepariamo mappe degli incarichi e cesti già assegnati ad ogni farm
       let farmIncarichiAssegnatiMap = new Map<string, Set<string>>();
+      let farmCestiAssegnatiMap = new Map<string, Set<string>>();
       if (isAssegnazionePreset && presetAttivo) {
-        // Costruisco una mappa delle assegnazioni esistenti per ogni farm
+        // Costruisco mappe delle assegnazioni esistenti per ogni farm
         assegnazioni.forEach(a => {
           if (a.tipo === 'incarico') {
             if (!farmIncarichiAssegnatiMap.has(a.farm_id)) {
               farmIncarichiAssegnatiMap.set(a.farm_id, new Set());
             }
             farmIncarichiAssegnatiMap.get(a.farm_id)?.add(a.riferimento_id);
+          } else if (a.tipo === 'cesto') {
+            if (!farmCestiAssegnatiMap.has(a.farm_id)) {
+              farmCestiAssegnatiMap.set(a.farm_id, new Set());
+            }
+            farmCestiAssegnatiMap.get(a.farm_id)?.add(a.riferimento_id);
           }
         });
       }
@@ -1842,54 +1888,89 @@ export default function TestGestioneAssegnazioni() {
               // Verifica per il filtro del preset
               let mostraFarmPerPreset = true;
               if (isAssegnazionePreset && presetAttivo) {
-                // Ottieni gli incarichi già assegnati a questa farm
+                // Ottieni gli incarichi e cesti già assegnati a questa farm
                 const incarichiAssegnati = farmIncarichiAssegnatiMap.get(farmId) || new Set();
+                const cestiAssegnati = farmCestiAssegnatiMap.get(farmId) || new Set();
                 
-                // Conta quanti incarichi del preset sono già assegnati a questa farm
-                let incarichiPresetGiaAssegnati = 0;
-                for (const incaricoId of presetAttivo.incarichi) {
-                  if (incarichiAssegnati.has(incaricoId)) {
-                    incarichiPresetGiaAssegnati++;
+                // Elementi del preset che devono essere ancora assegnati
+                let elementiDaAssegnare = 0;
+                
+                for (const elementoId of presetAttivo.incarichi) {
+                  // Verifica se l'elemento è un cesto
+                  const cesto = cesti.find(c => c.id === elementoId);
+                  
+                  if (cesto) {
+                    // Se è un cesto, verifica se è già assegnato
+                    if (cestiAssegnati.has(elementoId)) {
+                      // Cesto già assegnato, non aumentare il contatore
+                      continue;
+                    }
+                    
+                    // Verifica se tutti gli incarichi del cesto sono già assegnati
+                    const tuttiIncarichiCestoAssegnati = cesto.incarichi.every(
+                      incInCesto => incarichiAssegnati.has(incInCesto.incarico_id)
+                    );
+                    
+                    if (!tuttiIncarichiCestoAssegnati) {
+                      // Se almeno un incarico del cesto non è assegnato, incrementa il contatore
+                      elementiDaAssegnare++;
+                    }
+                  } else {
+                    // È un incarico normale
+                    if (!incarichiAssegnati.has(elementoId)) {
+                      elementiDaAssegnare++;
+                    }
                   }
                 }
                 
-                // Se tutti gli incarichi del preset sono già assegnati, non mostrare questa farm
-                mostraFarmPerPreset = incarichiPresetGiaAssegnati < presetAttivo.incarichi.length;
+                // Non filtriamo più le farm in base al numero di elementi da assegnare
+                // mostraFarmPerPreset = elementiDaAssegnare > 0;
+                
+                // Aggiungiamo una proprietà alla farm per indicare se ha tutti gli elementi del preset assegnati
+                // Questa verrà usata nel dialogo per lo stile visivo
+                farm.presetCompleto = elementiDaAssegnare === 0;
               }
               
-              // Se la farm passa il filtro del preset, aggiungila all'elenco
-              if (mostraFarmPerPreset) {
-                farmsList.push({
-                  ...farm,
-                  id: farmId,
-                  haAssegnazioni,
-                });
-              }
+              // Includiamo tutte le farm nella lista, indipendentemente se hanno il preset completo
+              farmsList.push({
+                id: farmId,
+                nome: farm.nome || `Farm ${i + 1}`,
+                tag: farm.tag || "",
+                diamanti: farm.diamanti || 0,
+                stato: farm.stato || "attivo",
+                principale: i === 0, // La prima farm è considerata principale
+                livello: farm.livello || 1,
+                derby_tags: farm.derby_tags || [],
+                haAssegnazioni,
+                presetCompleto: farm.presetCompleto || false
+              });
             }
           }
           
-          // Aggiunge l'utente con le sue farms all'array dei giocatori
+          // Se l'utente ha almeno una farm, lo aggiungiamo alla lista dei giocatori
           if (farmsList.length > 0) {
             giocatoriData.push({
               giocatore_id: utentiDoc.id,
-              giocatore_nome: utenteData.nome || `Utente ${utentiDoc.id}`,
+              giocatore_nome: utenteData.nome || `Giocatore ${utentiDoc.id}`,
               farms: farmsList
             });
           }
         }
       }
       
-      // Ordina i giocatori per nome
+      // Ordina i giocatori alfabeticamente per nome
       giocatoriData.sort((a, b) => a.giocatore_nome.localeCompare(b.giocatore_nome));
       
-      // Aggiorna lo stato con i dati ottenuti
+      // Aggiorna lo stato dei giocatori
       setGiocatoriEFarms(giocatoriData);
+      
+      // Apre il dialogo
+      setDialogoTrasferimentoAperto(true);
     } catch (error) {
-      console.error("Errore nel caricamento delle farms:", error);
-      mostraAlert("Errore nel caricamento delle farms", "error");
+      console.error("Errore nel caricamento delle farm:", error);
+      mostraAlert('Errore nel caricamento delle farm', 'error');
     } finally {
       setCaricandoFarms(false);
-      setDialogoTrasferimentoAperto(true);
     }
   };
   
@@ -2032,7 +2113,7 @@ export default function TestGestioneAssegnazioni() {
           where('farm_id', '==', farmId)
         );
         
-        const snapshot = await getDocs(assegnazioniQuery);
+        const snapshot = await getDocsWithRateLimit(assegnazioniQuery);
         
         // Aggiunge ogni documento al batch per eliminazione
         snapshot.forEach((doc) => {
@@ -2113,6 +2194,19 @@ export default function TestGestioneAssegnazioni() {
     await handleOpenTrasferimento('copia', true); // true indica che è un'assegnazione di preset
   };
   
+  // Verifica se tutti gli incarichi di un preset sono stati assegnati a una farm
+  const verificaPresetCompleto = (presetIncarichi: string[], farmId: string) => {
+    // Verifica che tutti gli incarichi del preset siano assegnati alla farm
+    return presetIncarichi.every((incaricoId) =>
+      assegnazioni.some(
+        (a) =>
+          (a.tipo === "incarico" || a.tipo === "cesto") &&
+          a.riferimento_id === incaricoId &&
+          a.farm_id === farmId
+      )
+    );
+  };
+
   // Aggiungi funzione per gestire le assegnazioni da preset a farm
   const handleAssegnazionePresetAFarms = async (farmIds: string[]) => {
     if (!presetAttivo || presetAttivo.incarichi.length === 0 || farmIds.length === 0) {
@@ -2169,6 +2263,14 @@ export default function TestGestioneAssegnazioni() {
         
         if (!farmInfo) {
           console.warn(`Informazioni farm non trovate per ID: ${farmId}`);
+          continue;
+        }
+        
+        // Verifica se tutti gli incarichi sono già assegnati alla farm
+        const presetGiaCompleto = verificaPresetCompleto(presetAttivo.incarichi, farmId);
+        if (presetGiaCompleto) {
+          console.log(`Preset già completamente assegnato alla farm ${farmId}`);
+          contatoreSaltati += presetAttivo.incarichi.length;
           continue;
         }
         
@@ -2382,6 +2484,121 @@ export default function TestGestioneAssegnazioni() {
     return cestiFiltratiPerDerby.filter(cesto => incarichiFiltratiPreset.includes(cesto.id));
   }, [presetAttivo, incarichiFiltratiPreset, filtraCestiPerDerby]);
 
+  // Funzione per forzare l'aggiornamento dei preset
+  const forzaAggiornamentoPresets = async () => {
+    try {
+      // Forza l'aggiornamento dei preset da Firebase
+      await presetsService.caricaPresets(true);
+    } catch (error) {
+      console.error("Errore nell'aggiornamento dei preset:", error);
+    }
+  };
+
+  // Funzioni per espandere o comprimere tutte le card contemporaneamente
+  const expandAllEdifici = () => {
+    const allEdificiIds = edifici.map(edificio => edificio.id);
+    setExpandedEdifici(allEdificiIds);
+  };
+
+  const collapseAllEdifici = () => {
+    setExpandedEdifici([]);
+  };
+
+  const toggleAllEdifici = () => {
+    if (expandedEdifici.length < edifici.length) {
+      expandAllEdifici();
+    } else {
+      collapseAllEdifici();
+    }
+  };
+  
+  // Funzioni per espandere o comprimere tutte le card di incarichi contemporaneamente
+  const expandAllIncarichi = () => {
+    try {
+      // Raccoglie tutti gli ID degli incarichi
+      const incarichiIds = [...incarichi.map(incarico => incarico.id), ...incarichiCitta.map(incarico => incarico.id)];
+      
+      // Salva nel localStorage
+      localStorage.setItem("expandedIncarichi", JSON.stringify(incarichiIds));
+      
+      // Emetti un evento per comunicare a tutti i componenti IncaricoCard
+      const event = new CustomEvent(ESPANDI_TUTTI_INCARICHI_EVENT, { detail: { incarichiIds } });
+      window.dispatchEvent(event);
+      
+      // Aggiorna lo stato
+      setTuttiIncarichiEspansi(true);
+    } catch (error) {
+      console.error("Errore nell'espansione di tutti gli incarichi:", error);
+    }
+  };
+
+  const collapseAllIncarichi = () => {
+    try {
+      // Svuota l'array nel localStorage
+      localStorage.setItem("expandedIncarichi", JSON.stringify([]));
+      
+      // Emetti un evento per comunicare a tutti i componenti IncaricoCard
+      const event = new CustomEvent(COMPRIMI_TUTTI_INCARICHI_EVENT);
+      window.dispatchEvent(event);
+      
+      // Aggiorna lo stato
+      setTuttiIncarichiEspansi(false);
+    } catch (error) {
+      console.error("Errore nella compressione di tutti gli incarichi:", error);
+    }
+  };
+
+  const toggleAllIncarichi = () => {
+    if (tuttiIncarichiEspansi) {
+      collapseAllIncarichi();
+    } else {
+      expandAllIncarichi();
+    }
+  };
+
+  // Effetto per sincronizzare lo stato tuttiIncarichiEspansi con il localStorage
+  useEffect(() => {
+    const checkExpandedState = () => {
+      try {
+        const expandedIncarichi = localStorage.getItem("expandedIncarichi");
+        if (expandedIncarichi) {
+          const expandedIds = JSON.parse(expandedIncarichi);
+          setTuttiIncarichiEspansi(expandedIds.length > 0);
+        } else {
+          setTuttiIncarichiEspansi(false);
+        }
+      } catch (error) {
+        console.error("Errore nel controllo degli incarichi espansi:", error);
+        setTuttiIncarichiEspansi(false);
+      }
+    };
+
+    // Controllo iniziale
+    checkExpandedState();
+
+    // Custom event handler per rilevare cambiamenti locali
+    const handleLocalChange = (event?: CustomEvent) => {
+      // Se riceviamo un evento con dettagli, usiamo l'informazione fornita
+      if (event && event.detail && typeof event.detail.totalExpanded === 'number') {
+        setTuttiIncarichiEspansi(event.detail.totalExpanded > 0);
+      } else {
+        // Altrimenti recuperiamo lo stato dal localStorage
+        checkExpandedState();
+      }
+    };
+
+    // Listener per gli eventi
+    window.addEventListener(ESPANDI_TUTTI_INCARICHI_EVENT, () => setTuttiIncarichiEspansi(true));
+    window.addEventListener(COMPRIMI_TUTTI_INCARICHI_EVENT, () => setTuttiIncarichiEspansi(false));
+    window.addEventListener(INCARICO_EXPANDED_STATE_CHANGED, handleLocalChange as EventListener);
+
+    return () => {
+      window.removeEventListener(ESPANDI_TUTTI_INCARICHI_EVENT, () => setTuttiIncarichiEspansi(true));
+      window.removeEventListener(COMPRIMI_TUTTI_INCARICHI_EVENT, () => setTuttiIncarichiEspansi(false));
+      window.removeEventListener(INCARICO_EXPANDED_STATE_CHANGED, handleLocalChange as EventListener);
+    };
+  }, []);
+
   return (
     <Layout>
       <Snackbar open={showAlert} autoHideDuration={6000} onClose={() => setShowAlert(false)}>
@@ -2400,6 +2617,12 @@ export default function TestGestioneAssegnazioni() {
         modalita={modalitaTrasferimento}
         giocatori={giocatoriEFarms}
         isAssegnazionePreset={presetAttivo !== null && modalitaTrasferimento === 'copia'}
+        presetNome={presetAttivo?.nome}
+        farmIdsGiaAssegnate={presetAttivo ? 
+          giocatoriEFarms.flatMap(g => g.farms.map(f => f.id)).filter(farmId => 
+            verificaPresetCompleto(presetAttivo.incarichi, farmId)
+          ) : 
+          []}
       />
       
       {/* Banner di preset attivo */}
@@ -2548,39 +2771,52 @@ export default function TestGestioneAssegnazioni() {
           {/* Box contenente i pulsanti di visualizzazione, ordinamento, ricerca e reset */}
           {/* Aggiungo mb: 1.5 per spaziare dal menu a tendina sottostante */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+            {/* Pulsante per espandere/comprimere tutte le card */}
+            <TooltipWrapper title={expandedEdifici.length < edifici.length ? "Espandi tutti gli edifici" : "Comprimi tutti gli edifici"}>
+              <span>
+                <IconButton 
+                  onClick={toggleAllEdifici}
+                  color="primary"
+                  disabled={tabValue !== 0 || loading} // disabilitato se non siamo nella tab incarichi o durante il caricamento
+                >
+                  {expandedEdifici.length < edifici.length ? <ExpandMoreIcon /> : <ExpandLessIcon />}
+                </IconButton>
+              </span>
+            </TooltipWrapper>
+            
             {/* Pulsante per cambiare la visualizzazione (solo per la tab Incarichi) */}
-            <Tooltip title={visualizzazioneGlobale ? "Visualizza per edificio" : "Visualizza lista completa"}>
+            <TooltipWrapper title={visualizzazioneGlobale ? "Visualizza per edificio" : "Visualizza lista completa"}>
               <span>
                 <IconButton 
                   onClick={handleToggleVisualizzazione}
                   color={visualizzazioneGlobale ? "primary" : "default"}
                   disabled={tabValue !== 0} // disabilitato se non siamo nella tab incarichi
                 >
-                  {visualizzazioneGlobale ? <ViewListIcon /> : <ViewModuleIcon />}
+                  {visualizzazioneGlobale ? <ViewModuleIcon /> : <ViewListIcon />}
                 </IconButton>
               </span>
-            </Tooltip>
+            </TooltipWrapper>
             
             {/* Pulsanti di ordinamento (sempre visibili) */}
-            <Tooltip title={ordinamentoInverso ? "Ordina per livello (crescente)" : "Ordina per livello (decrescente)"}>
+            <TooltipWrapper title={ordinamentoInverso ? "Ordina per livello (crescente)" : "Ordina per livello (decrescente)"}>
               <IconButton 
                 onClick={() => handleChangeOrdinamento('livello')}
                 color={ordinamentoLivello ? "primary" : "default"}
               >
                 {ordinamentoLivello && ordinamentoInverso ? <SortIcon sx={{ transform: 'rotate(180deg)' }} /> : <SortIcon />}
               </IconButton>
-            </Tooltip>
+            </TooltipWrapper>
             
-            <Tooltip title={ordinamentoInverso ? "Ordina alfabeticamente (A-Z)" : "Ordina alfabeticamente (Z-A)"}>
+            <TooltipWrapper title={ordinamentoInverso ? "Ordina alfabeticamente (A-Z)" : "Ordina alfabeticamente (Z-A)"}>
               <IconButton 
                 onClick={() => handleChangeOrdinamento('alfabetico')}
                 color={ordinamentoAlfabetico ? "primary" : "default"}
               >
                 {ordinamentoAlfabetico && ordinamentoInverso ? <SortByAlphaIcon sx={{ transform: 'rotate(180deg)' }} /> : <SortByAlphaIcon />}
               </IconButton>
-            </Tooltip>
+            </TooltipWrapper>
             
-            <Tooltip title={ordinamentoInverso ? "Ordina per assegnazioni (meno a più)" : "Ordina per assegnazioni (più a meno)"}>
+            <TooltipWrapper title={ordinamentoInverso ? "Ordina per assegnazioni (meno a più)" : "Ordina per assegnazioni (più a meno)"}>
               <span>
                 <IconButton 
                   onClick={() => handleChangeOrdinamento('assegnazione')}
@@ -2590,19 +2826,17 @@ export default function TestGestioneAssegnazioni() {
                   {ordinamentoAssegnazione && ordinamentoInverso ? <PeopleAltIcon sx={{ transform: 'rotate(180deg)' }} /> : <PeopleAltIcon />}
                 </IconButton>
               </span>
-            </Tooltip>
-            
-            
+            </TooltipWrapper>
             
             {/* Pulsante di ricerca */}
-            <Tooltip title="Cerca">
+            <TooltipWrapper title="Cerca">
               <IconButton
                 size="small"
                 onClick={toggleSearchBar}
               >
                 <SearchIcon />
               </IconButton>
-            </Tooltip>
+            </TooltipWrapper>
 
             {/* Campo di ricerca espandibile */}
             {searchExpanded && (
@@ -2635,7 +2869,7 @@ export default function TestGestioneAssegnazioni() {
             )}
             
             {/* Pulsante RESET */}
-            <Tooltip title="Resetta tutte le assegnazioni">
+            <TooltipWrapper title="Resetta tutte le assegnazioni">
               <IconButton 
                 onClick={resetAssegnazioni}
                 disabled={loading}
@@ -2645,7 +2879,7 @@ export default function TestGestioneAssegnazioni() {
               >
                 <CancelIcon />
               </IconButton>
-            </Tooltip>
+            </TooltipWrapper>
           </Box>
 
           {/* Striscia del derby selezionato come Select diretto - ora è posizionata sotto la Box dei pulsanti */}
@@ -2789,6 +3023,33 @@ export default function TestGestioneAssegnazioni() {
               ))}
             </Select>
           </FormControl>
+          
+          {/* Aggiunta del pulsante Espandi/Comprimi assegnazioni in una nuova posizione dopo il FormControl */}
+          <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%', mb: 0 }}>
+            <Button
+              variant="contained"
+              size="small"
+              onClick={toggleAllIncarichi}
+              color="primary"
+              disabled={loading}
+              startIcon={tuttiIncarichiEspansi ? <UnfoldLessIcon /> : <UnfoldMoreIcon />}
+              sx={{ 
+                fontSize: '0.5rem', 
+                py: 0.8,
+                px: 1,
+                boxShadow: '0 2px 4px rgba(33, 150, 243, 0.25)',
+                '&:hover': {
+                  boxShadow: '0 4px 8px rgba(33, 150, 243, 0.4)',
+                  background: theme => theme.palette.primary.dark
+                },
+                '&:active': {
+                  transform: 'scale(0.98)',
+                }
+              }}
+            >
+              {tuttiIncarichiEspansi ? "COMPRIMI ASSEGNAZIONI" : "ESPANDI ASSEGNAZIONI"}
+            </Button>
+          </Box>
         </Box>
 
         {/* Barra di ricerca espandibile */}

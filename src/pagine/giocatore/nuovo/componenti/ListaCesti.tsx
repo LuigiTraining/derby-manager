@@ -272,7 +272,7 @@ export default function ListaCesti({
   }, [cesti, incarichi, incarichiCitta, assegnazioni, searchQuery, mostraSoloAssegnati]);
 
   return (
-    <Box>
+    <Box sx={{ width: '100%', maxWidth: '100%' }}>
       {cestiFiltrati.length === 0 ? (
         <Typography variant="body1" sx={{ textAlign: "center", my: 4 }}>
           {t('derby.nessun_cesto_trovato')}
@@ -286,7 +286,8 @@ export default function ListaCesti({
           // Rimuovo qualsiasi padding o margin che potrebbe causare spazi
           '& > *': { 
             mb: 0, 
-            borderRadius: 0 
+            borderRadius: 0,
+            width: '100%'
           }
         }}>
           {cestiFiltrati.map(cesto => (
@@ -380,6 +381,8 @@ const CestoItem: React.FC<CestoItemProps> = ({
       sx={{ 
         mb: 0, // Rimuovo il margin per evitare spazi
         mt: 0, // Rimuovo il margin per evitare spazi
+        width: '100%', // Assicura che il cesto occupi tutta la larghezza
+        mx: 0, // Rimuove i margini laterali
         backgroundColor: isEvidenziato 
           ? "rgba(255, 215, 0, 0.2)" 
           : completato 

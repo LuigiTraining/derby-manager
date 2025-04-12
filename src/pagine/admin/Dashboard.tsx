@@ -21,7 +21,15 @@ import AssignmentIcon from '@mui/icons-material/Assignment';
 import EmojiEventsIcon from '@mui/icons-material/EmojiEvents';
 import Layout from '../../componenti/layout/Layout';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, where, getDocs, orderBy, limit, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, limit, onSnapshot } from 'firebase/firestore'
+import { 
+  getDocWithRateLimit, 
+  getDocsWithRateLimit, 
+  setDocWithRateLimit,
+  updateDocWithRateLimit,
+  deleteDocWithRateLimit,
+  addDocWithRateLimit
+} from '../../configurazione/firebase';;
 import { db } from '../../configurazione/firebase';
 import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
@@ -78,7 +86,7 @@ export default function Dashboard() {
   useEffect(() => {
     const loadAssegnazioni = async () => {
       // Carica assegnazioni città
-      const cittaSnapshot = await getDocs(collection(db, 'citta'));
+      const cittaSnapshot = await getDocsWithRateLimit(collection(db, 'citta'));
       let assegnazioniCitta = 0;
       cittaSnapshot.docs.forEach(doc => {
         const data = doc.data();
@@ -95,7 +103,7 @@ export default function Dashboard() {
       });
 
       // Carica assegnazioni cesti
-      const cestiSnapshot = await getDocs(collection(db, 'cesti'));
+      const cestiSnapshot = await getDocsWithRateLimit(collection(db, 'cesti'));
       let assegnazioniCesti = 0;
       cestiSnapshot.docs.forEach(doc => {
         const data = doc.data();
@@ -112,7 +120,7 @@ export default function Dashboard() {
       });
 
       // Carica assegnazioni incarichi
-      const incarichiSnapshot = await getDocs(collection(db, 'incarichi'));
+      const incarichiSnapshot = await getDocsWithRateLimit(collection(db, 'incarichi'));
       let assegnazioniIncarichi = 0;
       incarichiSnapshot.docs.forEach(doc => {
         const data = doc.data();
@@ -157,10 +165,10 @@ export default function Dashboard() {
         limit(5)
       );
 
-      const snapshot = await getDocs(q);
+      const snapshot = await getDocsWithRateLimit(q);
       const incarichi = await Promise.all(snapshot.docs.map(async doc => {
         const data = doc.data();
-        const giocatoreDoc = await getDocs(query(collection(db, 'utenti'), where('id', '==', data.giocatore_id)));
+        const giocatoreDoc = await getDocsWithRateLimit(query(collection(db, 'utenti'), where('id', '==', data.giocatore_id)));
         const giocatore = giocatoreDoc.docs[0]?.data();
         
         return {
@@ -180,7 +188,7 @@ export default function Dashboard() {
   useEffect(() => {
     const loadGiocatoriAttivi = async () => {
       const q = query(collection(db, 'utenti'), where('ruolo', '!=', 'admin'));
-      const snapshot = await getDocs(q);
+      const snapshot = await getDocsWithRateLimit(q);
       
       const giocatori = snapshot.docs
         .map(doc => ({

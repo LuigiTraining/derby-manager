@@ -22,6 +22,7 @@
     "@types/react-beautiful-dnd": "^13.1.8",
     "@types/react-color": "^3.0.13",
     "@types/react-router-dom": "^5.3.3",
+    "axios": "^1.8.4",
     "country-flag-icons": "^1.5.16",
     "date-fns": "^4.1.0",
     "firebase": "^11.2.0",

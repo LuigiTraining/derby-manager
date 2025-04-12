@@ -69,7 +69,6 @@ const LanguageSwitcher = () => {
         >
           <Box sx={{ display: "flex", alignItems: "center" }}>
             {languageFlags[currentLanguage as keyof typeof languageFlags]}
-            <LanguageIcon sx={{ ml: 0.5 }} />
           </Box>
         </IconButton>
       </Tooltip>

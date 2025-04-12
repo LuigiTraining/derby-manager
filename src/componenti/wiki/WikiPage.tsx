@@ -18,7 +18,15 @@ import {
 } from '@mui/material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { db } from '../../configurazione/firebase';
-import { collection, doc, getDoc, query, where, getDocs, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, query, where, getDocs, updateDoc } from 'firebase/firestore'
+import { 
+  getDocWithRateLimit, 
+  getDocsWithRateLimit, 
+  setDocWithRateLimit,
+  updateDocWithRateLimit,
+  deleteDocWithRateLimit,
+  addDocWithRateLimit
+} from '../../configurazione/firebase';;
 import EditIcon from '@mui/icons-material/Edit';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import ExpandLess from '@mui/icons-material/ExpandLess';
@@ -71,7 +79,7 @@ export default function WikiPage({ pagePath }: WikiPageProps) {
   // Carica la pagina corrente
   useEffect(() => {
     const loadPage = async () => {
-      const pageDoc = await getDoc(doc(db, 'wiki_pages', pagePath));
+      const pageDoc = await getDocWithRateLimit(doc(db, 'wiki_pages', pagePath));
       if (pageDoc.exists()) {
         setPage({
           id: pageDoc.id,
@@ -85,7 +93,7 @@ export default function WikiPage({ pagePath }: WikiPageProps) {
         
         for (const part of parts) {
           currentPath += (currentPath ? '/' : '') + part;
-          const partDoc = await getDoc(doc(db, 'wiki_pages', currentPath));
+          const partDoc = await getDocWithRateLimit(doc(db, 'wiki_pages', currentPath));
           if (partDoc.exists()) {
             crumbs.push({
               title: partDoc.data().title,
@@ -104,7 +112,7 @@ export default function WikiPage({ pagePath }: WikiPageProps) {
   // Carica l'albero di navigazione
   useEffect(() => {
     const loadNavigationTree = async () => {
-      const pagesSnapshot = await getDocs(collection(db, 'wiki_pages'));
+      const pagesSnapshot = await getDocsWithRateLimit(collection(db, 'wiki_pages'));
       const pages = pagesSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -132,7 +140,7 @@ export default function WikiPage({ pagePath }: WikiPageProps) {
   const handleSave = async (newContent: string) => {
     if (!page || !currentUser) return;
 
-    await updateDoc(doc(db, 'wiki_pages', pagePath), {
+    await updateDocWithRateLimit(doc(db, 'wiki_pages', pagePath), {
       content: newContent,
       lastModified: new Date(),
       modifiedBy: currentUser.id

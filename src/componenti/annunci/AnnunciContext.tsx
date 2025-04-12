@@ -1,5 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, doc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, updateDoc, doc } from 'firebase/firestore'
+import { 
+  getDocWithRateLimit, 
+  getDocsWithRateLimit, 
+  setDocWithRateLimit,
+  updateDocWithRateLimit,
+  deleteDocWithRateLimit,
+  addDocWithRateLimit
+} from '../../configurazione/firebase';;
 import { db } from '../../configurazione/firebase';
 import { useAuth } from '../autenticazione/AuthContext';
 import { inviaNotifica } from '../../servizi/notificheService';
@@ -101,7 +109,7 @@ export function AnnunciProvider({ children }: { children: React.ReactNode }) {
       numero: annunci.length > 0 ? Math.max(...annunci.map(a => a.numero)) + 1 : 1
     };
 
-    const docRef = await addDoc(collection(db, 'annunci'), nuovoAnnuncio);
+    const docRef = await addDocWithRateLimit(collection(db, 'annunci'), nuovoAnnuncio);
 
     // Invia notifica a tutti o solo agli utenti specificati
     const titolo = 'Nuovo Annuncio';
@@ -124,7 +132,7 @@ export function AnnunciProvider({ children }: { children: React.ReactNode }) {
     if (!currentUser) return;
 
     const annuncioRef = doc(db, 'annunci', id);
-    await updateDoc(annuncioRef, {
+    await updateDocWithRateLimit(annuncioRef, {
       contenuto,
       lastModified: new Date(),
       modifiedBy: currentUser.uid,

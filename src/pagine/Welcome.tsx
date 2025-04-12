@@ -28,7 +28,15 @@ import { useAuth } from '../componenti/autenticazione/AuthContext';
 import { useAnnunci } from '../componenti/annunci/AnnunciContext';
 import Layout from '../componenti/layout/Layout';
 import { db } from '../configurazione/firebase';
-import { collection, doc, onSnapshot, updateDoc, query, where, orderBy, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, doc, onSnapshot, updateDoc, query, where, orderBy, setDoc, deleteDoc } from 'firebase/firestore'
+import { 
+  getDocWithRateLimit, 
+  getDocsWithRateLimit, 
+  setDocWithRateLimit,
+  updateDocWithRateLimit,
+  deleteDocWithRateLimit,
+  addDocWithRateLimit
+} from '../configurazione/firebase';;
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
@@ -184,9 +192,9 @@ export default function Welcome() {
       };
 
       if (isNew) {
-        await setDoc(doc(db, 'annunci', annuncioData.id), annuncioData);
+        await setDocWithRateLimit(doc(db, 'annunci', annuncioData.id), annuncioData);
       } else {
-        await updateDoc(doc(db, 'annunci', annuncioCorrente!.id), annuncioData);
+        await updateDocWithRateLimit(doc(db, 'annunci', annuncioCorrente!.id), annuncioData);
       }
 
       setEditingContent(null);
@@ -203,7 +211,7 @@ export default function Welcome() {
 
     try {
       const docRef = doc(db, 'annunci', annuncioToDelete.id);
-      await deleteDoc(docRef);
+      await deleteDocWithRateLimit(docRef);
       setSuccess('Annuncio eliminato con successo!');
     } catch (error) {
       console.error('Errore durante l\'eliminazione dell\'annuncio:', error);
@@ -220,7 +228,7 @@ export default function Welcome() {
 
     try {
       const docRef = doc(db, 'annunci', annuncioId);
-      await updateDoc(docRef, {
+      await updateDocWithRateLimit(docRef, {
         [`lettoDa.${currentUser.id}`]: new Date()
       });
       // Aggiorna localmente l'array degli annunci da leggere

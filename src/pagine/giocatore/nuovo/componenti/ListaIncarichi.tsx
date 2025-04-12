@@ -514,7 +514,7 @@ export default function ListaIncarichi({
     }
     
     return (
-      <Box>
+      <Box sx={{ width: '100%', maxWidth: '100%' }}>
         {incarichiFiltratiEOrdinati.length === 0 ? (
           <Typography variant="body1" sx={{ textAlign: "center", my: 4 }}>
             {mostraSoloAssegnati 
@@ -522,7 +522,7 @@ export default function ListaIncarichi({
               : "Nessun incarico trovato."}
           </Typography>
         ) : (
-          <Grid container spacing={0} sx={{ width: '100%' }}>
+          <Grid container spacing={0} sx={{ width: '100%', ml: 0, mr: 0 }}>
             {incarichiFiltratiEOrdinati.map(incarico => {
               const assegnazione = trovaAssegnazione(incarico.id);
               const progresso = trovaProgresso(incarico.id);
@@ -557,7 +557,7 @@ export default function ListaIncarichi({
   };
 
   return (
-    <Box>
+    <Box sx={{ width: '100%', maxWidth: '100%' }}>
       {visualizzazioneGlobale ? renderListaGlobale() : renderListaPerEdificio()}
     </Box>
   );

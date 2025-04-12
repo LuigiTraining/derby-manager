@@ -29,7 +29,15 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import BusinessIcon from '@mui/icons-material/Business';
 import Layout from '../../componenti/layout/Layout';
-import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore'
+import { 
+  getDocWithRateLimit, 
+  getDocsWithRateLimit, 
+  setDocWithRateLimit,
+  updateDocWithRateLimit,
+  deleteDocWithRateLimit,
+  addDocWithRateLimit
+} from '../../configurazione/firebase';;
 import { db } from '../../configurazione/firebase';
 import { Edificio } from '../../tipi/edificio';
 import UploadImmagine from '../../componenti/comune/UploadImmagine';
@@ -49,7 +57,7 @@ export default function GestioneEdifici() {
   const caricaEdifici = async () => {
     try {
       const edificiRef = collection(db, 'edifici');
-      const snapshot = await getDocs(edificiRef);
+      const snapshot = await getDocsWithRateLimit(edificiRef);
       const edificiData = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -86,7 +94,7 @@ export default function GestioneEdifici() {
   const handleDeleteEdificio = async (id: string) => {
     if (window.confirm('Sei sicuro di voler eliminare questo edificio?')) {
       try {
-        await deleteDoc(doc(db, 'edifici', id));
+        await deleteDocWithRateLimit(doc(db, 'edifici', id));
         setSuccess('Edificio eliminato con successo!');
         caricaEdifici();
       } catch (error) {
@@ -110,7 +118,7 @@ export default function GestioneEdifici() {
         immagine: formData.immagine || '',
       };
 
-      await setDoc(doc(db, 'edifici', edificioData.id), edificioData);
+      await setDocWithRateLimit(doc(db, 'edifici', edificioData.id), edificioData);
       setSuccess(editingEdificio ? 'Edificio aggiornato con successo!' : 'Edificio creato con successo!');
       // Reset del form e chiusura del dialog
       setEditingEdificio(null);

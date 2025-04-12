@@ -8,7 +8,15 @@ import {
   addDoc, 
   Timestamp,
   writeBatch
-} from 'firebase/firestore';
+} from 'firebase/firestore'
+import { 
+  getDocWithRateLimit, 
+  getDocsWithRateLimit, 
+  setDocWithRateLimit,
+  updateDocWithRateLimit,
+  deleteDocWithRateLimit,
+  addDocWithRateLimit
+} from '../configurazione/firebase';;
 import { db } from '../configurazione/firebase';
 import { ProgressoIncarico, ProgressoCesto } from '../tipi/progresso';
 
@@ -29,7 +37,7 @@ export const ProgressiService = {
       where('farm_id', '==', farm_id)
     );
     
-    const snapshot = await getDocs(progressiQuery);
+    const snapshot = await getDocsWithRateLimit(progressiQuery);
     return snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
@@ -43,7 +51,7 @@ export const ProgressiService = {
    */
   aggiornaQuantita: async (progresso_id: string, nuova_quantita: number) => {
     const progressoRef = doc(db, 'progressi_incarichi', progresso_id);
-    await updateDoc(progressoRef, {
+    await updateDocWithRateLimit(progressoRef, {
       quantita_prodotta: nuova_quantita,
       ultimo_aggiornamento: Timestamp.now()
     });
@@ -64,7 +72,7 @@ export const ProgressiService = {
       is_assegnato
     };
 
-    const docRef = await addDoc(collection(db, 'progressi_incarichi'), nuovoProgresso);
+    const docRef = await addDocWithRateLimit(collection(db, 'progressi_incarichi'), nuovoProgresso);
     return {
       id: docRef.id,
       ...nuovoProgresso
@@ -78,7 +86,7 @@ export const ProgressiService = {
    */
   segnaAssegnato: async (progresso_id: string, is_assegnato: boolean) => {
     const progressoRef = doc(db, 'progressi_incarichi', progresso_id);
-    await updateDoc(progressoRef, {
+    await updateDocWithRateLimit(progressoRef, {
       is_assegnato,
       ultimo_aggiornamento: Timestamp.now()
     });
@@ -90,7 +98,7 @@ export const ProgressiService = {
    */
   resetProgresso: async (progresso_id: string) => {
     const progressoRef = doc(db, 'progressi_incarichi', progresso_id);
-    await updateDoc(progressoRef, {
+    await updateDocWithRateLimit(progressoRef, {
       quantita_prodotta: 0,
       ultimo_aggiornamento: Timestamp.now()
     });

@@ -8,7 +8,15 @@ import {
 import { Incarico } from '../../tipi/incarico';
 import { Cesto } from '../../tipi/cesto';
 import { getStorage, ref, getDownloadURL } from 'firebase/storage';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore'
+import { 
+  getDocWithRateLimit, 
+  getDocsWithRateLimit, 
+  setDocWithRateLimit,
+  updateDocWithRateLimit,
+  deleteDocWithRateLimit,
+  addDocWithRateLimit
+} from '../../configurazione/firebase';;
 import { db } from '../../configurazione/firebase';
 
 interface StampaIncarichiProps {
@@ -55,7 +63,7 @@ const StampaIncarichi: React.FC<StampaIncarichiProps> = ({
     const caricaEdifici = async () => {
       try {
         const edificiRef = collection(db, 'edifici');
-        const snapshot = await getDocs(edificiRef);
+        const snapshot = await getDocsWithRateLimit(edificiRef);
         const nomiMap: { [key: string]: string } = {};
         snapshot.docs.forEach(doc => {
           nomiMap[doc.id] = doc.data().nome || '';

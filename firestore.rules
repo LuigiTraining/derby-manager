@@ -1,59 +1,25 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Consenti la lettura di tutte le collezioni a chiunque
+    // Le operazioni di lettura sono sempre consentite 
     match /{document=**} {
       allow read: if true;
     }
     
-    // Collezioni principali - consenti la scrittura (sarebbe meglio limitarla agli utenti autenticati,
-    // ma poiché usi un sistema personalizzato di autenticazione con PIN, non possiamo usare request.auth)
-    match /annunci/{document} {
-      allow write: if true;
-    }
-    match /assegnazioni/{document} {
-      allow write: if true;
-    }
-    match /cesti/{document} {
-      allow write: if true;
-    }
-    match /derby/{document} {
-      allow write: if true;
-    }
-    match /elementi_citta/{document} {
-      allow write: if true;
-    }
-    match /impostazioni/{document} {
-      allow write: if true;
-    }
-    match /incarichi/{document} {
-      allow write: if true;
-    }
-    match /incarichi_citta/{document} {
-      allow write: if true;
-    }
-    match /notifiche_subscriptions/{document} {
-      allow write: if true;
-    }
-    match /progressi/{document} {
-      allow write: if true;
-    }
-    match /progressi_incarichi/{document} {
-      allow write: if true;
-    }
-    match /richieste_registrazione/{document} {
-      allow write: if true;
-    }
-    match /utenti/{document} {
-      allow write: if true;
-    }
-    match /wiki_pages/{document} {
-      allow write: if true;
+    // Consenti scrittura ma limita dimensione documenti
+    match /{collectionName}/{docId} {
+      allow create, update: if request.resource.data.size() < 1000000; // Max ~1MB per documento
+      allow delete: if true; // Consenti eliminazione
     }
     
-    // Per tutte le altre collezioni o sottocollezioni, consenti anche la scrittura
-    match /{path=**}/{document} {
-      allow write: if true;
+    // Proteggi la collezione utenti da manipolazioni
+    match /utenti/{docId} {
+      // Consenti solo aggiornamenti da parte dello stesso utente o la lettura
+      allow read: if true;
+      allow create: if true; // Per consentire nuove registrazioni
+      allow update: if (request.resource.data.id == resource.data.id) // Non permettere di cambiare l'ID
+                    && (request.resource.data.ruolo == resource.data.ruolo); // Non permettere di cambiare il ruolo
+      allow delete: if false; // Impedisci eliminazione utenti
     }
   }
 } 

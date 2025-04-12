@@ -30,11 +30,14 @@ import {
   Chip,
   Alert,
   ListItemButton,
+  Checkbox,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import TransferWithinAStationIcon from "@mui/icons-material/TransferWithinAStation";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { db } from "../../../../configurazione/firebase";
 
 // Definizione dei tipi
 interface Farm {
@@ -46,12 +49,23 @@ interface Farm {
   principale?: boolean;
   livello?: number;
   haAssegnazioni?: boolean;
+  derby_tags?: string[]; // Array di ID dei derby associati alla farm
+  presetCompleto?: boolean; // Nuova proprietà che indica se la farm ha completato il preset
 }
 
 interface GiocatoreConFarms {
   giocatore_id: string;
   giocatore_nome: string;
   farms: Farm[];
+}
+
+// Definizione del tipo Derby
+interface Derby {
+  id: string;
+  nome: string;
+  colore: string;
+  attivo: boolean;
+  prossimo?: boolean;
 }
 
 // Definizione dell'interfaccia per le props del componente
@@ -64,6 +78,8 @@ interface DialogoTrasferimentoAssegnazioniProps {
   modalita: 'copia' | 'trasferisci' | 'elimina';
   giocatori: GiocatoreConFarms[];
   isAssegnazionePreset?: boolean;
+  presetNome?: string; // Nome del preset selezionato
+  farmIdsGiaAssegnate?: string[]; // Array di farm IDs che hanno già tutti gli incarichi del preset assegnati
 }
 
 const DialogoTrasferimentoAssegnazioni: React.FC<DialogoTrasferimentoAssegnazioniProps> = ({
@@ -74,13 +90,20 @@ const DialogoTrasferimentoAssegnazioni: React.FC<DialogoTrasferimentoAssegnazion
   onAssegnaPreset,
   modalita,
   giocatori,
-  isAssegnazionePreset = false,
+  isAssegnazionePreset,
+  presetNome,
+  farmIdsGiaAssegnate = []
 }) => {
   // Stati per gestire la selezione e i filtri
   const [searchQuery, setSearchQuery] = useState("");
   const [farmIdOrigine, setFarmIdOrigine] = useState<string>("");
   const [farmIdsDestinazione, setFarmIdsDestinazione] = useState<string[]>([]);
   const [mostraFarmInattive, setMostraFarmInattive] = useState(false);
+  const [mostraTagDerby, setMostraTagDerby] = useState(false);
+  const [mostraGiaAssegnati, setMostraGiaAssegnati] = useState(true);
+  const [derby, setDerby] = useState<Derby[]>([]);
+  const [selectedDerby, setSelectedDerby] = useState<string>("");
+  const [derbyMenuOpen, setDerbyMenuOpen] = useState(false);
   const [farmOrigineSelect, setFarmOrigineSelect] = useState<{
     giocatore_id: string;
     giocatore_nome: string;
@@ -97,6 +120,8 @@ const DialogoTrasferimentoAssegnazioni: React.FC<DialogoTrasferimentoAssegnazion
       setFarmIdsDestinazione([]);
       setFarmOrigineSelect(null);
       setFarmsDaEliminare([]);
+      setSelectedDerby("");
+      setMostraGiaAssegnati(true);
     }
   }, [open, modalita]);
 
@@ -112,6 +137,30 @@ const DialogoTrasferimentoAssegnazioni: React.FC<DialogoTrasferimentoAssegnazion
     }
   }, [modalita]);
 
+  // Carica i derby disponibili quando il dialogo si apre
+  useEffect(() => {
+    const caricaDerby = async () => {
+      try {
+        const derbyRef = collection(db, "derby");
+        const q = query(derbyRef, orderBy("nome", "asc"));
+        const querySnapshot = await getDocs(q);
+        
+        const derbyData = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Derby[];
+        
+        setDerby(derbyData);
+      } catch (error) {
+        console.error("Errore nel caricamento dei derby:", error);
+      }
+    };
+    
+    if (open) {
+      caricaDerby();
+    }
+  }, [open]);
+
   // Funzione per filtrare le farms in base alla ricerca
   const filteredGiocatori = giocatori.filter((giocatore) => {
     const matchGiocatore = giocatore.giocatore_nome.toLowerCase().includes(searchQuery.toLowerCase());
@@ -122,6 +171,27 @@ const DialogoTrasferimentoAssegnazioni: React.FC<DialogoTrasferimentoAssegnazion
     
     return matchGiocatore || matchFarms;
   });
+
+  // Funzione per verificare se una farm ha già tutti gli incarichi del preset assegnati
+  const isFarmGiaAssegnata = (farmId: string) => {
+    // Verifica attraverso la lista di farmIdsGiaAssegnate passata come prop
+    if (farmIdsGiaAssegnate && farmIdsGiaAssegnate.length > 0 && farmIdsGiaAssegnate.includes(farmId)) {
+      return true;
+    }
+    
+    // Verifica anche attraverso la proprietà presetCompleto della farm
+    if (isAssegnazionePreset) {
+      // Cerca la farm in tutti i giocatori
+      for (const giocatore of giocatori) {
+        const farm = giocatore.farms.find(f => f.id === farmId);
+        if (farm && farm.presetCompleto) {
+          return true;
+        }
+      }
+    }
+    
+    return false;
+  };
 
   // Funzione per filtrare le farms in base allo stato (attive/inattive)
   const getFarmsFiltrate = (giocatore: { giocatore_id: string; giocatore_nome: string; farms: Farm[] }) => {
@@ -141,8 +211,29 @@ const DialogoTrasferimentoAssegnazioni: React.FC<DialogoTrasferimentoAssegnazion
         return false;
       }
       
+      // Se non mostriamo le farm già assegnate e questa farm ha già il preset completo, non mostrarla
+      if (!mostraGiaAssegnati && isFarmGiaAssegnata(farm.id)) {
+        return false;
+      }
+      
       // Se è la farm di origine, non mostrarla nelle destinazioni (solo in modalità trasferimento)
       if (modalita !== 'elimina' && farm.id === farmIdOrigine) {
+        return false;
+      }
+      
+      // Filtra per derby selezionato
+      if (selectedDerby && farm.derby_tags) {
+        // Verifica se la farm ha il derby selezionato nei suoi tag
+        if (!Array.isArray(farm.derby_tags)) {
+          return false;
+        }
+        
+        // Verifica se l'ID del derby è presente nei tag della farm
+        if (!farm.derby_tags.includes(selectedDerby)) {
+          return false;
+        }
+      } else if (selectedDerby) {
+        // Se non ci sono derby_tags ma è selezionato un derby, non mostrare la farm
         return false;
       }
       
@@ -154,8 +245,8 @@ const DialogoTrasferimentoAssegnazioni: React.FC<DialogoTrasferimentoAssegnazion
         return true; // era farm.haAssegnazioni === true
       }
       
-      // Questo è il posto dove implementare il filtraggio per le farm che hanno già tutti gli incarichi del preset
-      // Comunico con il componente genitore attraverso le props
+      // Mostriamo TUTTE le farm, anche quelle che hanno già tutti gli incarichi del preset assegnati
+      // Le farm con preset completo verranno visualizzate con lo stile speciale (verde con spunta)
       return true;
     });
   };
@@ -175,6 +266,11 @@ const DialogoTrasferimentoAssegnazioni: React.FC<DialogoTrasferimentoAssegnazion
 
   // Handler per toggle delle farm di destinazione
   const handleToggleFarmDestinazione = (farmId: string) => {
+    // Non fare nulla se la farm ha già il preset completo
+    if (isFarmGiaAssegnata(farmId)) {
+      return;
+    }
+    
     setFarmIdsDestinazione((prev) => {
       if (prev.includes(farmId)) {
         return prev.filter((id) => id !== farmId);
@@ -230,7 +326,7 @@ const DialogoTrasferimentoAssegnazioni: React.FC<DialogoTrasferimentoAssegnazion
   const handleConfirm = () => {
     if (modalita === 'elimina' && onElimina) {
       onElimina(farmsDaEliminare);
-    } else if (isAssegnazionePreset && onAssegnaPreset) {
+    } else if (onAssegnaPreset) {
       onAssegnaPreset(farmIdsDestinazione);
     } else if (farmIdOrigine && farmIdsDestinazione.length > 0) {
       // Ci assicuriamo che modalita sia 'copia' o 'trasferisci' prima di chiamare onConfirm
@@ -253,6 +349,30 @@ const DialogoTrasferimentoAssegnazioni: React.FC<DialogoTrasferimentoAssegnazion
     }
   };
 
+  // Gestisce il reset dei filtri
+  const handleResetFilters = () => {
+    setSearchQuery("");
+    setSelectedDerby("");
+    setMostraFarmInattive(false);
+    setMostraTagDerby(false);
+    setMostraGiaAssegnati(true);
+  };
+
+  // Gestisce il cambio del derby selezionato
+  const handleDerbyChange = (event: React.MouseEvent<HTMLElement>, derbyId: string) => {
+    if (selectedDerby === derbyId) {
+      setSelectedDerby("");
+    } else {
+      setSelectedDerby(derbyId);
+    }
+    setDerbyMenuOpen(false);
+  };
+
+  // Controlla se ci sono filtri attivi
+  const hasActiveFilters = () => {
+    return searchQuery !== "" || selectedDerby !== "" || mostraFarmInattive || mostraTagDerby || !mostraGiaAssegnati;
+  };
+
   // Renderizza il contenuto appropriato in base alla modalità selezionata
   const renderContenuto = () => {
     if (modalita === 'elimina') {
@@ -266,6 +386,7 @@ const DialogoTrasferimentoAssegnazioni: React.FC<DialogoTrasferimentoAssegnazion
             <Typography variant="subtitle2">
               Seleziona le farm da cui eliminare le assegnazioni:
             </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
             <FormControlLabel
               control={
                 <Switch
@@ -274,8 +395,19 @@ const DialogoTrasferimentoAssegnazioni: React.FC<DialogoTrasferimentoAssegnazion
                   size="small"
                 />
               }
-              label={<Typography variant="body2">Mostra farm inattive</Typography>}
-            />
+                label={<Typography variant="body2" sx={{ fontSize: '0.8rem' }}>Mostra farm inattive</Typography>}
+              />
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={mostraTagDerby}
+                    onChange={(e) => setMostraTagDerby(e.target.checked)}
+                    size="small"
+                  />
+                }
+                label={<Typography variant="body2" sx={{ fontSize: '0.8rem' }}>Mostra tag derby</Typography>}
+              />
+            </Box>
           </Box>
           
           <TextField
@@ -352,8 +484,66 @@ const DialogoTrasferimentoAssegnazioni: React.FC<DialogoTrasferimentoAssegnazion
                           </Avatar>
                         </ListItemAvatar>
                         <ListItemText 
-                          primary={farm.nome || `Farm ${farm.id.substring(0, 8)}`}
-                          secondary={farm.stato === 'inattivo' ? 'Inattiva' : 'Attiva'}
+                          primary={
+                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                              <Typography variant="body2">
+                                {farm.nome || `Farm ${farm.id.substring(0, 8)}`}
+                              </Typography>
+                              {farm.haAssegnazioni && (
+                                <Tooltip title="Questa farm ha delle assegnazioni">
+                                  <Box 
+                                    component="span" 
+                                    sx={{ 
+                                      display: 'inline-block', 
+                                      width: 8, 
+                                      height: 8, 
+                                      borderRadius: '50%', 
+                                      backgroundColor: 'success.main',
+                                      ml: 1
+                                    }} 
+                                  />
+                                </Tooltip>
+                              )}
+                            </Box>
+                          }
+                          secondary={
+                            <>
+                              <Typography variant="caption" component="span">
+                                {farm.stato === 'inattivo' ? 'Inattiva' : 'Attiva'}
+                              </Typography>
+                              
+                              {/* Mostra i derby tags associati alla farm solo se lo switch è attivato */}
+                              {mostraTagDerby && farm.derby_tags && farm.derby_tags.length > 0 && (
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.3 }}>
+                                  {farm.derby_tags.map((tagId) => {
+                                    // Trova il derby corrispondente all'ID del tag
+                                    const derbyInfo = derby.find(d => d.id === tagId);
+                                    if (!derbyInfo) return null;
+                                    
+                                    return (
+                                      <Tooltip key={tagId} title={derbyInfo.nome} arrow placement="top">
+                                        <Chip
+                                          label={derbyInfo.nome}
+                                          size="small"
+                                          sx={{ 
+                                            height: 16,
+                                            fontSize: '0.62rem',
+                                            backgroundColor: derbyInfo.colore || 'primary.main',
+                                            color: 'white',
+                                            '& .MuiChip-label': { 
+                                              px: 0.6,
+                                              py: 0,
+                                              lineHeight: 1.2
+                                            }
+                                          }}
+                                        />
+                                      </Tooltip>
+                                    );
+                                  })}
+                                </Box>
+                              )}
+                            </>
+                          }
                           primaryTypographyProps={{ variant: 'body2' }}
                           secondaryTypographyProps={{ variant: 'caption' }}
                         />
@@ -460,16 +650,40 @@ const DialogoTrasferimentoAssegnazioni: React.FC<DialogoTrasferimentoAssegnazion
               ? "Seleziona le farm a cui assegnare gli incarichi del preset:" 
               : "Seleziona le farms di destinazione:"}
           </Typography>
-          <FormControlLabel
-            control={
-              <Switch
-                checked={mostraFarmInattive}
-                onChange={(e) => setMostraFarmInattive(e.target.checked)}
-                size="small"
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={mostraFarmInattive}
+                  onChange={(e) => setMostraFarmInattive(e.target.checked)}
+                  size="small"
+                />
+              }
+              label={<Typography variant="body2" sx={{ fontSize: '0.8rem' }}>Mostra farm inattive</Typography>}
+            />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={mostraTagDerby}
+                  onChange={(e) => setMostraTagDerby(e.target.checked)}
+                  size="small"
+                />
+              }
+              label={<Typography variant="body2" sx={{ fontSize: '0.8rem' }}>Mostra tag derby</Typography>}
+            />
+            {isAssegnazionePreset && (
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={mostraGiaAssegnati}
+                    onChange={(e) => setMostraGiaAssegnati(e.target.checked)}
+                    size="small"
+                  />
+                }
+                label={<Typography variant="body2" sx={{ fontSize: '0.8rem' }}>Mostra già assegnati</Typography>}
               />
-            }
-            label={<Typography variant="body2">Mostra farm inattive</Typography>}
-          />
+            )}
+          </Box>
         </Box>
 
         {/* Filtri e ricerca per farm destinazione */}
@@ -492,78 +706,329 @@ const DialogoTrasferimentoAssegnazioni: React.FC<DialogoTrasferimentoAssegnazion
               }}
             />
 
-            {/* Lista delle farm di destinazione */}
-            <Box sx={{ maxHeight: '300px', overflow: 'auto', border: '1px solid #e0e0e0', borderRadius: 1 }}>
+            {/* Menu a tendina per filtrare per derby */}
+            <Box sx={{ position: 'relative', mb: 2 }}>
+              <Box
+                onClick={() => setDerbyMenuOpen(!derbyMenuOpen)}
+                sx={{
+                  border: '1px solid #e0e0e0',
+                  borderRadius: 1,
+                  p: 1.5,
+                  cursor: 'pointer',
+                  bgcolor: 'background.paper',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  '&:hover': {
+                    bgcolor: 'rgba(0, 0, 0, 0.02)',
+                  },
+                }}
+              >
+                <Typography variant="body2" color={selectedDerby ? 'text.primary' : 'text.secondary'}>
+                  {selectedDerby 
+                    ? `Filtra per Derby: ${derby.find(d => d.id === selectedDerby)?.nome || 'Sconosciuto'}`
+                    : 'Filtra per Derby'}
+                </Typography>
+                <Box
+                  component="span"
+                  sx={{
+                    width: 0,
+                    height: 0,
+                    borderLeft: '5px solid transparent',
+                    borderRight: '5px solid transparent',
+                    borderTop: '5px solid #666',
+                    transition: 'transform 0.2s',
+                    transform: derbyMenuOpen ? 'rotate(180deg)' : 'none',
+                  }}
+                />
+              </Box>
+
+              {/* Dropdown menu per i derby */}
+              {derbyMenuOpen && (
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    bgcolor: 'background.paper',
+                    boxShadow: 3,
+                    borderRadius: 1,
+                    zIndex: 1000,
+                    maxHeight: '300px',
+                    overflow: 'auto',
+                  }}
+                >
+                  <List dense>
+                    <ListItem sx={{ bgcolor: 'rgba(0, 0, 0, 0.04)' }}>
+                      <ListItemText primary={<Typography variant="body2">Tutti i Derby</Typography>} />
+                    </ListItem>
+                    {derby.map((d) => (
+                      <ListItemButton
+                        key={d.id}
+                        selected={selectedDerby === d.id}
+                        onClick={(e) => handleDerbyChange(e, d.id)}
+                        sx={{
+                          pl: 2,
+                          '&.Mui-selected': {
+                            bgcolor: 'rgba(25, 118, 210, 0.08)',
+                          },
+                          '&.Mui-selected:hover': {
+                            bgcolor: 'rgba(25, 118, 210, 0.12)',
+                          },
+                        }}
+                      >
+                        <Box
+                          component="span"
+                          sx={{
+                            display: 'inline-block',
+                            width: 12,
+                            height: 12,
+                            borderRadius: '50%',
+                            bgcolor: d.colore || 'primary.main',
+                            mr: 1.5,
+                          }}
+                        />
+                        <ListItemText primary={<Typography variant="body2">{d.nome}</Typography>} />
+                      </ListItemButton>
+                    ))}
+                  </List>
+                </Box>
+              )}
+            </Box>
+
+            {/* Checkbox "Seleziona tutto" */}
+            <Box sx={{ mb: 2, display: 'flex', alignItems: 'center' }}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={
+                      // Controlla se tutte le farm visibili (filtrate e non già assegnate) sono selezionate
+                      filteredGiocatori
+                        .flatMap(giocatore => getFarmsFiltrate(giocatore)
+                          .filter(farm => !isFarmGiaAssegnata(farm.id))
+                          .map(farm => farm.id))
+                        .every(farmId => farmIdsDestinazione.includes(farmId)) &&
+                      // Assicurati che ci sia almeno una farm selezionabile
+                      filteredGiocatori
+                        .flatMap(giocatore => getFarmsFiltrate(giocatore)
+                          .filter(farm => !isFarmGiaAssegnata(farm.id))).length > 0
+                    }
+                    onChange={(e) => {
+                      const allVisibleFarmIds = filteredGiocatori
+                        .flatMap(giocatore => getFarmsFiltrate(giocatore)
+                          .filter(farm => !isFarmGiaAssegnata(farm.id))
+                          .map(farm => farm.id));
+                      
+                      if (e.target.checked) {
+                        // Seleziona tutte le farm visibili filtrate (tranne quelle già assegnate)
+                        setFarmIdsDestinazione(Array.from(new Set([...farmIdsDestinazione, ...allVisibleFarmIds])));
+                      } else {
+                        // Deseleziona tutte le farm visibili
+                        setFarmIdsDestinazione(farmIdsDestinazione.filter(id => !allVisibleFarmIds.includes(id)));
+                      }
+                    }}
+                    sx={{ '& .MuiSvgIcon-root': { fontSize: '1.2rem' } }}
+                  />
+                }
+                label={
+                  <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                    Seleziona tutto
+                  </Typography>
+                }
+              />
+            </Box>
+
+            {/* Lista delle farm di destinazione - stile modificato per imitare DialogoSelezioneFarmNuovo */}
+            <Box sx={{ maxHeight: '400px', overflow: 'auto', border: '1px solid #e0e0e0', borderRadius: 1 }}>
               <List dense>
                 {filteredGiocatori.map((giocatore) => {
                   const farmsFiltrate = getFarmsFiltrate(giocatore);
                   if (farmsFiltrate.length === 0) return null;
                   
+                  const selezionaTutte = areAllPlayerFarmsSelected(giocatore.giocatore_id);
+                  
                   return (
                     <React.Fragment key={giocatore.giocatore_id}>
-                      <ListItem>
+                      <ListItem sx={{ bgcolor: "background.paper", py: 0.25, mt: 0.25, mb: 0, borderRadius: '4px' }}>
+                        <Checkbox
+                          checked={selezionaTutte}
+                          onChange={() => handleSelectAllFarmsOfPlayer(giocatore.giocatore_id)}
+                          indeterminate={
+                            farmsFiltrate.some(farm => farmIdsDestinazione.includes(farm.id)) && 
+                            !selezionaTutte
+                          }
+                          size="small"
+                          sx={{ p: 0.25, '& .MuiSvgIcon-root': { fontSize: '0.9rem' } }}
+                        />
                         <ListItemText 
                           primary={
-                            <Typography variant="subtitle2">
+                            <Typography 
+                              variant="subtitle1" 
+                              sx={{ 
+                                fontWeight: "bold", 
+                                fontSize: '0.85rem', 
+                                color: 'primary.main',
+                                lineHeight: 1.2
+                              }}
+                            >
                               {giocatore.giocatore_nome}
                             </Typography>
                           }
                         />
-                        <ListItemSecondaryAction>
-                          <Tooltip title="Seleziona tutte le farm di questo giocatore">
-                            <IconButton 
-                              edge="end" 
-                              size="small"
-                              onClick={() => handleSelectAllFarmsOfPlayer(giocatore.giocatore_id)}
-                              color={areAllPlayerFarmsSelected(giocatore.giocatore_id) ? "primary" : "default"}
-                            >
-                              <ContentCopyIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </ListItemSecondaryAction>
                       </ListItem>
+                      
                       {farmsFiltrate.map((farm) => (
-                        <ListItemButton 
+                        <Box
                           key={farm.id}
-                          selected={farmIdsDestinazione.includes(farm.id)}
                           onClick={() => handleToggleFarmDestinazione(farm.id)}
                           sx={{ 
-                            pl: 4,
-                            '&.Mui-selected': {
-                              backgroundColor: 'rgba(25, 118, 210, 0.08)',
+                            pl: 0.5,
+                            borderLeft: "1px solid rgba(0, 0, 0, 0.12)",
+                            ml: 2,
+                            display: 'flex',
+                            alignItems: 'center',
+                            py: 0.25,
+                            mb: 0.25,
+                            cursor: 'pointer',
+                            bgcolor: farmIdsDestinazione.includes(farm.id)
+                              ? "rgba(25, 118, 210, 0.08)" 
+                              : 'transparent',
+                            '&:hover': {
+                              bgcolor: farmIdsDestinazione.includes(farm.id)
+                                ? "rgba(25, 118, 210, 0.12)" 
+                                : "rgba(0, 0, 0, 0.04)",
                             },
-                            '&.Mui-selected:hover': {
-                              backgroundColor: 'rgba(25, 118, 210, 0.12)',
-                            }
+                            filter: farm.stato === "inattivo" ? "grayscale(100%)" : "none",
+                            borderRadius: '4px',
                           }}
                         >
-                          <ListItemAvatar sx={{ minWidth: 36 }}>
-                            <Avatar 
+                          {!isFarmGiaAssegnata(farm.id) && (
+                            <Checkbox
+                              checked={farmIdsDestinazione.includes(farm.id)}
+                              onChange={() => handleToggleFarmDestinazione(farm.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              size="small"
+                              sx={{ p: 0.25, '& .MuiSvgIcon-root': { fontSize: '0.9rem' } }}
+                            />
+                          )}
+                          {isFarmGiaAssegnata(farm.id) && (
+                            <Box 
                               sx={{ 
-                                width: 24, 
-                                height: 24, 
-                                fontSize: '0.75rem',
-                                bgcolor: farm.stato === 'inattivo' ? 'grey.400' : 'primary.main'
+                                width: 20, 
+                                height: 20, 
+                                display: 'flex', 
+                                justifyContent: 'center', 
+                                alignItems: 'center', 
+                                color: 'success.main',
+                                ml: 0.3,
+                                mr: 0.3
                               }}
                             >
-                              {farm.livello || '?'}
-                            </Avatar>
-                          </ListItemAvatar>
-                          <ListItemText 
-                            primary={farm.nome || `Farm ${farm.id.substring(0, 8)}`}
-                            secondary={farm.stato === 'inattivo' ? 'Inattiva' : 'Attiva'}
-                            primaryTypographyProps={{ variant: 'body2' }}
-                            secondaryTypographyProps={{ variant: 'caption' }}
-                          />
-                        </ListItemButton>
+                              <Box 
+                                component="span" 
+                                sx={{ 
+                                  fontSize: '0.8rem', 
+                                  fontWeight: 'bold', 
+                                  color: '#4caf50'
+                                }}
+                              >
+                                ✓
+                              </Box>
+                            </Box>
+                          )}
+                          <Avatar 
+                            sx={{ 
+                              bgcolor: isFarmGiaAssegnata(farm.id) ? 'rgba(76, 175, 80, 0.1)' : 'rgb(33, 150, 243, 0.1)',
+                              color: isFarmGiaAssegnata(farm.id) ? '#4caf50' : 'rgb(33, 150, 243)',
+                              width: 20,
+                              height: 20,
+                              fontSize: '0.7rem',
+                              mr: 1,
+                              fontStyle: 'italic'
+                            }}
+                          >
+                            {farm.livello}
+                          </Avatar>
+                          <Box sx={{ flexGrow: 1 }}>
+                            <Typography 
+                              variant="body2"
+                              sx={{
+                                color: isFarmGiaAssegnata(farm.id) ? '#4caf50' : 'inherit', 
+                                fontWeight: isFarmGiaAssegnata(farm.id) ? 'bold' : 'normal'
+                              }}
+                            >
+                              {farm.nome}
+                              {isFarmGiaAssegnata(farm.id) && (
+                                <Typography 
+                                  component="span"
+                                  variant="caption"
+                                  sx={{ 
+                                    ml: 0.5,
+                                    color: 'success.main',
+                                    fontSize: '0.7rem'
+                                  }}
+                                >
+                                  (già assegnato)
+                                </Typography>
+                              )}
+                            </Typography>
+                            
+                            {/* Mostra i derby tags associati alla farm solo se lo switch è attivato */}
+                            {mostraTagDerby && farm.derby_tags && farm.derby_tags.length > 0 && (
+                              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.2 }}>
+                                {farm.derby_tags.map((tagId) => {
+                                  // Trova il derby corrispondente all'ID del tag
+                                  const derbyInfo = derby.find(d => d.id === tagId);
+                                  if (!derbyInfo) return null;
+                                  
+                                  return (
+                                    <Tooltip key={tagId} title={derbyInfo.nome} arrow placement="top">
+                                      <Chip
+                                        label={derbyInfo.nome}
+                                        size="small"
+                                        sx={{ 
+                                          height: 16,
+                                          fontSize: '0.62rem',
+                                          backgroundColor: derbyInfo.colore || 'primary.main',
+                                          color: 'white',
+                                          '& .MuiChip-label': { 
+                                            px: 0.6,
+                                            py: 0,
+                                            lineHeight: 1.2
+                                          }
+                                        }}
+                                      />
+                                    </Tooltip>
+                                  );
+                                })}
+                              </Box>
+                            )}
+                          </Box>
+                        </Box>
                       ))}
-                      <Divider />
+                      
+                      <Divider component="li" sx={{ my: 0.25 }} />
                     </React.Fragment>
                   );
                 })}
               </List>
             </Box>
           </>
+        )}
+
+        {/* Pulsante di reset per i filtri */}
+        {hasActiveFilters() && (
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={handleResetFilters}
+              sx={{ fontSize: '0.75rem', py: 0.25, px: 1 }}
+            >
+              Resetta filtri
+            </Button>
+          </Box>
         )}
       </>
     );
@@ -572,7 +1037,7 @@ const DialogoTrasferimentoAssegnazioni: React.FC<DialogoTrasferimentoAssegnazion
   // Determina il titolo del dialogo in base alla modalità
   const getTitolo = () => {
     if (isAssegnazionePreset) {
-      return "Assegnazione Incarichi da Preset";
+      return presetNome || "Assegnazione Incarichi da Preset";
     }
     
     switch (modalita) {
@@ -654,7 +1119,7 @@ const DialogoTrasferimentoAssegnazioni: React.FC<DialogoTrasferimentoAssegnazion
         {renderContenuto()}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} variant="outlined">
+        <Button onClick={onClose} color="inherit">
           Annulla
         </Button>
         <Button
@@ -664,7 +1129,12 @@ const DialogoTrasferimentoAssegnazioni: React.FC<DialogoTrasferimentoAssegnazion
           disabled={isConfermaDisabilitata()}
           startIcon={getIconaConferma()}
         >
-          {getTestoPulsanteConferma()}
+          {modalita === 'elimina' 
+            ? getTestoPulsanteConferma() 
+            : isAssegnazionePreset 
+              ? `Assegna (${farmIdsDestinazione.length})`
+              : getTestoPulsanteConferma()
+          }
         </Button>
       </DialogActions>
     </Dialog>

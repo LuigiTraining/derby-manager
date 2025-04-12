@@ -26,7 +26,15 @@ import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import { collection, query, orderBy, onSnapshot, doc, setDoc, updateDoc, deleteDoc, Timestamp, writeBatch, getDocs, where, getDoc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, setDoc, updateDoc, deleteDoc, Timestamp, writeBatch, getDocs, where, getDoc } from 'firebase/firestore'
+import { 
+  getDocWithRateLimit, 
+  getDocsWithRateLimit, 
+  setDocWithRateLimit,
+  updateDocWithRateLimit,
+  deleteDocWithRateLimit,
+  addDocWithRateLimit
+} from '../../configurazione/firebase';;
 import { db } from '../../configurazione/firebase';
 import { useAuth } from '../../componenti/autenticazione/AuthContext';
 import { Derby } from '../../tipi/derby';
@@ -112,7 +120,7 @@ export default function GestioneDerby() {
 
       if (formData.attivo) {
         const derbyAttivoQuery = query(collection(db, 'derby'), where('attivo', '==', true));
-        const derbyAttivoSnapshot = await getDocs(derbyAttivoQuery);
+        const derbyAttivoSnapshot = await getDocsWithRateLimit(derbyAttivoQuery);
         
         derbyAttivoSnapshot.docs.forEach(doc => {
           if (doc.id !== editingDerby?.id) {
@@ -123,7 +131,7 @@ export default function GestioneDerby() {
 
       if (formData.prossimo) {
         const derbyProssimoQuery = query(collection(db, 'derby'), where('prossimo', '==', true));
-        const derbyProssimoSnapshot = await getDocs(derbyProssimoQuery);
+        const derbyProssimoSnapshot = await getDocsWithRateLimit(derbyProssimoQuery);
         
         derbyProssimoSnapshot.docs.forEach(doc => {
           if (doc.id !== editingDerby?.id) {
@@ -155,7 +163,7 @@ export default function GestioneDerby() {
     if (!window.confirm('Sei sicuro di voler eliminare questo derby?')) return;
 
     try {
-      await deleteDoc(doc(db, 'derby', derbyId));
+      await deleteDocWithRateLimit(doc(db, 'derby', derbyId));
     } catch (error) {
       console.error('Errore durante l\'eliminazione del derby:', error);
     }
@@ -175,13 +183,13 @@ export default function GestioneDerby() {
   const handleToggleActive = async (derbyId: string, currentActive: boolean) => {
     try {
       if (currentActive) {
-        await updateDoc(doc(db, 'derby', derbyId), {
+        await updateDocWithRateLimit(doc(db, 'derby', derbyId), {
           attivo: false,
           data_modifica: Timestamp.now()
         });
       } else {
         const derbyAttivoQuery = query(collection(db, 'derby'), where('attivo', '==', true));
-        const derbyAttivoSnapshot = await getDocs(derbyAttivoQuery);
+        const derbyAttivoSnapshot = await getDocsWithRateLimit(derbyAttivoQuery);
         
         const batch = writeBatch(db);
         
@@ -207,14 +215,14 @@ export default function GestioneDerby() {
   const handleSetProssimo = async (derbyId: string) => {
     try {
       const derbyRef = doc(db, 'derby', derbyId);
-      const derbySnap = await getDoc(derbyRef);
+      const derbySnap = await getDocWithRateLimit(derbyRef);
       const isProssimo = derbySnap.data()?.prossimo || false;
 
       const batch = writeBatch(db);
 
       if (!isProssimo) {
         const derbyProssimoQuery = query(collection(db, 'derby'), where('prossimo', '==', true));
-        const derbyProssimoSnapshot = await getDocs(derbyProssimoQuery);
+        const derbyProssimoSnapshot = await getDocsWithRateLimit(derbyProssimoQuery);
         
         derbyProssimoSnapshot.docs.forEach(doc => {
           batch.update(doc.ref, { prossimo: false });

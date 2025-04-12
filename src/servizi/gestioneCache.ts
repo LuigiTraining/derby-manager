@@ -1,4 +1,12 @@
-import { collection, getDocs, query, where, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { collection, getDocs, query, where, doc, getDoc, setDoc, updateDoc } from "firebase/firestore"
+import { 
+  getDocWithRateLimit, 
+  getDocsWithRateLimit, 
+  setDocWithRateLimit,
+  updateDocWithRateLimit,
+  deleteDocWithRateLimit,
+  addDocWithRateLimit
+} from '../configurazione/firebase';;
 import { db } from "../configurazione/firebase";
 
 // Interfaccia per i metadati della cache
@@ -23,7 +31,7 @@ export const caricaDatiConCache = async (
     
     // Se è richiesto un aggiornamento forzato o non c'è cache, scarica da Firebase
     const collectionRef = collection(db, nomeCollezione);
-    const snapshot = await getDocs(collectionRef);
+    const snapshot = await getDocsWithRateLimit(collectionRef);
     const dati = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     
     // Salva i dati nella cache
@@ -81,7 +89,7 @@ export const caricaAssegnazioniConCache = async (
       where("farm_id", "<=", prefissoFarmIdEnd)
     );
     
-    const snapshot = await getDocs(q);
+    const snapshot = await getDocsWithRateLimit(q);
     const assegnazioni = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     
     // Salva i dati nella cache
@@ -145,7 +153,7 @@ export const aggiornaTuttiDati = async (userId: string) => {
 export const creaDocumentoMetadati = async () => {
   try {
     // Verifica se il documento esiste già
-    const metadatiDoc = await getDoc(doc(db, "metadati", "collezioni"));
+    const metadatiDoc = await getDocWithRateLimit(doc(db, "metadati", "collezioni"));
     
     if (!metadatiDoc.exists()) {
       // Crea il documento con i timestamp attuali
@@ -159,7 +167,7 @@ export const creaDocumentoMetadati = async () => {
       };
       
       // Crea il documento
-      await setDoc(doc(db, "metadati", "collezioni"), metadati);
+      await setDocWithRateLimit(doc(db, "metadati", "collezioni"), metadati);
     }
     
     return true;
@@ -173,7 +181,7 @@ export const creaDocumentoMetadati = async () => {
 export const aggiornaTimestampCollezione = async (nomeCollezione: string) => {
   try {
     // Verifica se il documento esiste già
-    const metadatiDoc = await getDoc(doc(db, "metadati", "collezioni"));
+    const metadatiDoc = await getDocWithRateLimit(doc(db, "metadati", "collezioni"));
     
     if (metadatiDoc.exists()) {
       // Ottieni i dati attuali
@@ -186,7 +194,7 @@ export const aggiornaTimestampCollezione = async (nomeCollezione: string) => {
       };
       
       // Aggiorna il documento
-      await updateDoc(doc(db, "metadati", "collezioni"), nuoviMetadati);
+      await updateDocWithRateLimit(doc(db, "metadati", "collezioni"), nuoviMetadati);
     } else {
       // Se il documento non esiste, crealo
       await creaDocumentoMetadati();
@@ -197,7 +205,7 @@ export const aggiornaTimestampCollezione = async (nomeCollezione: string) => {
       };
       
       // Aggiorna il documento
-      await updateDoc(doc(db, "metadati", "collezioni"), metadati);
+      await updateDocWithRateLimit(doc(db, "metadati", "collezioni"), metadati);
     }
     
     return true;
